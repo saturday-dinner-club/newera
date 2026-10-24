@@ -1,5 +1,4 @@
-import { eligibleImageRule, evaluateImageRules, type ImageTriggerRule } from '$lib/images/triggers';
-import { judgeImageConditions } from '$lib/server/oev';
+import { createImageDirector } from '$lib/server/oev';
 import { ImageGenerationError } from './common';
 import { generateWithImageConfig, ImageGenerationBusy, withImageGeneration } from './generate';
 import { acceptImageCheck, completeImageCheck, getImageCursor, imageCheckValid, pendingImageCheck, queueAutomaticImageChecks, recoverImageChecks, setImageCheckStatus, type ImageCheckJob } from './trigger-store';
@@ -14,25 +13,21 @@ export async function processImageCheck(job: ImageCheckJob): Promise<void> {
 		try {
 			if (!imageCheckValid(job)) { setImageCheckStatus(job.id, 'skipped'); return; }
 			setImageCheckStatus(job.id, 'checking');
-			const { scene, rules, manual } = job.input;
-			let cursor = getImageCursor(job.worldId);
-			let fired: ImageTriggerRule[] = [];
-			if (!manual) {
-				// Queued snapshots are processed in order. Rewinds/reset remove the jobs and establish a new baseline.
-				if (scene.revision <= cursor.revision) { setImageCheckStatus(job.id, 'skipped'); return; }
-				const semantic = rules.filter((rule) => eligibleImageRule(rule, scene, cursor) && rule.naturalLanguage.trim());
-				const matches = await judgeImageConditions(semantic.map((rule) => ({ id: rule.id, condition: rule.naturalLanguage })), scene.context, job.input.models, AbortSignal.timeout(120000));
-				const evaluated = evaluateImageRules(rules, scene, cursor, matches);
-				cursor = evaluated.cursor; fired = evaluated.fired;
-			}
-			const reason = manual ? '현재 장면 요청' : fired.map((rule) => rule.name).join(' · ');
-			if (!acceptImageCheck(job, cursor, reason)) return;
-			const instructions = fired.map((rule) => rule.prompt.trim()).filter(Boolean).join('\n').slice(0, 8000);
-			const prompt = ['Create one narrative illustration of the current scene. Use only visible appearances and established events. Do not add text or captions.', instructions, `Current scene and recent events:\n${scene.context}`].filter(Boolean).join('\n\n');
+			const { scene, policy, config, models } = job.input;
+			const cursor = getImageCursor(job.worldId);
+			if (scene.revision <= cursor.revision) { setImageCheckStatus(job.id, 'skipped'); return; }
+			const director = createImageDirector(models, AbortSignal.timeout(120000));
+			const generate = await director.shouldGenerate({ imageGeneration: policy, scene: scene.context, objectStates: scene.objectStates, lastCheck: { minute: cursor.minute, tick: cursor.tick, sceneId: cursor.sceneId }, previousRequest: cursor.lastRequest, elapsedMinutes: Math.max(0, scene.minute - (cursor.lastRequest?.minute ?? cursor.startedMinute ?? cursor.minute)) });
+			if (!generate) { acceptImageCheck(job, null); return; }
+			if (!imageCheckValid(job)) { setImageCheckStatus(job.id, 'skipped'); return; }
+			setImageCheckStatus(job.id, 'prompting');
+			const profile = { provider: config.provider, model: config.provider === 'comfyui' ? config.workflowId : config.model, stylePrompt: config.stylePrompt };
+			const prompt = await director.writePrompt({ scene: scene.context, promptFormat: policy.promptFormat, promptInstructions: policy.promptInstructions, imageProfile: profile }, policy.promptFormat);
+			if (!acceptImageCheck(job, prompt)) return;
 			const result = await generateWithImageConfig(job.input.config, prompt);
 			completeImageCheck(job.id, result.images[0].bytes, result.images[0].mediaType);
 		} catch (error) {
-			setImageCheckStatus(job.id, 'failed', undefined, error instanceof ImageGenerationError ? error.message : '삽화 조건 판단 또는 생성에 실패했습니다. 프리셋과 세션의 생성 모델 설정을 확인해 주세요. 자동 재시도하지 않습니다.');
+			setImageCheckStatus(job.id, 'failed', undefined, error instanceof ImageGenerationError ? error.message : '삽화의 System One 판단·프롬프트 작성 또는 생성에 실패했습니다. 세션의 판단·생성 모델과 이미지 프리셋을 확인해 주세요. 자동 재시도하지 않습니다.');
 		}
 	});
 }

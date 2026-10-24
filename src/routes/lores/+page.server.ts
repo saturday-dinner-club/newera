@@ -15,6 +15,7 @@ export const actions: Actions = {
 			editWorld(String(body.get('worldId')), Number(body.get('revision')), (world) => {
 				Object.assign(world.definition, { name: String(body.get('name')), description: String(body.get('description')), rules: String(body.get('rules') || '') });
 				if (body.has('writingStyle')) world.definition.writingStyle = String(body.get('writingStyle') ?? '');
+				if (body.has('imageConditions')) world.definition.imageGeneration = { conditions: String(body.get('imageConditions') ?? ''), promptFormat: String(body.get('imagePromptFormat')) as 'tags' | 'natural', promptInstructions: String(body.get('imagePromptInstructions') ?? '') };
 				if (body.has('appearanceChangeMinutes')) world.definition.appearanceChangeMinutes = Number(body.get('appearanceChangeMinutes'));
 				if (body.has('startingSceneId')) {
 					world.definition.startingSceneId = String(body.get('startingSceneId'));

@@ -177,9 +177,16 @@ export function validateDefinition(value: unknown): WorldDefinition {
 		appearanceChangeMinutes = integer(source.appearanceChangeMinutes, '옷차림 재선택 간격', 1440);
 		if (appearanceChangeMinutes < 1) throw new Error('옷차림 재선택 간격은 1~1440분이어야 합니다.');
 	}
+	let imageGeneration: WorldDefinition['imageGeneration'];
+	if (source.imageGeneration !== undefined) {
+		const policy = record(source.imageGeneration, '로어북 이미지 생성 지침');
+		if (Object.keys(policy).some((key) => !['conditions', 'promptFormat', 'promptInstructions'].includes(key)) || !['tags', 'natural'].includes(String(policy.promptFormat))) throw new Error('이미지 프롬프트 형식은 tags 또는 natural이어야 합니다.');
+		imageGeneration = { conditions: text(policy.conditions, '이미지 생성 조건', 8000, true), promptFormat: policy.promptFormat as 'tags' | 'natural', promptInstructions: text(policy.promptInstructions ?? '', '이미지 프롬프트 작성 지침', 4000, true) };
+	}
 	return {
 		name: text(source.name, '세계관 이름', 200), description: text(source.description, '세계관 설명', 40000), rules: text(source.rules, '세계관 규칙', 20000, true),
 		...(source.writingStyle !== undefined ? { writingStyle: text(source.writingStyle, '서술 문체 지침', 4000, true) } : {}),
+		...(imageGeneration !== undefined ? { imageGeneration } : {}),
 		startingSceneId, scenes, templates, spawns, ...(appearanceChangeMinutes !== undefined ? { appearanceChangeMinutes } : {})
 	};
 }

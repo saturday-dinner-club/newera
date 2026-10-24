@@ -70,45 +70,49 @@ async function waitJob(base, db, worldId, failure = false) {
 	assert.fail('job did not finish');
 }
 
-test('automatic illustration conditions coalesce, persist API image bytes and survive restart without duplicate charges', async () => {
-	let imageCalls = 0; let semanticCalls = 0;
+test('lorebook System One decision gates prompt writing and persistent images with independent session preset selection', async () => {
+	let imageCalls = 0; let decisions = 0; let promptCalls = 0;
 	const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', 'base64');
 	const model = createServer(async (request, response) => {
 		const parts = []; for await (const part of request) parts.push(part);
 		const body = JSON.parse(Buffer.concat(parts).toString()); response.setHeader('content-type', 'application/json');
-		if (request.url === '/v1/images/generations') { imageCalls++; await pause(60); response.end(JSON.stringify({ data: [{ b64_json: png.toString('base64') }] })); }
-		else if (request.url === '/v1/chat/completions') { semanticCalls++; const { conditions } = JSON.parse(body.messages[1].content); response.end(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({ matches: conditions.map(({ id }) => ({ id, matched: true })) }) } }] })); }
-		else { response.statusCode = 404; response.end('{}'); }
+		if (request.url === '/v1/systemone') {
+			decisions++; assert.equal(body.questions.image_generation.type, 'choice'); assert.equal(body.state.imageGeneration.conditions, '첫 장면에서만 한 장을 생성한다.');
+			response.end(JSON.stringify({ answers: { image_generation: { type: 'choice', choice: decisions === 1 ? 'generate' : 'skip' } } }));
+		} else if (request.url === '/v1/chat/completions') {
+			promptCalls++; assert.equal(body.response_format.json_schema.name, 'image_prompt');
+			assert.equal(JSON.parse(body.messages[1].content).promptFormat, 'tags');
+			response.end(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({ prompt: 'theater entrance, warm lights, watercolor' }) } }] }));
+		} else if (request.url === '/v1/images/generations') {
+			imageCalls++; assert.equal(body.prompt, 'Watercolor.\n\ntheater entrance, warm lights, watercolor');
+			response.end(JSON.stringify({ data: [{ b64_json: png.toString('base64') }] }));
+		} else { response.statusCode = 404; response.end('{}'); }
 	});
 	const port = await listen(model); const directory = scratch();
 	let running = await app(directory, `http://127.0.0.1:${port}/v1`, { NEWERA_INTEGRATION_IMAGE_KEY: 'private-test-image-key' });
 	const db = new DatabaseSync(join(directory, 'newera.sqlite'));
-	const imagePost = async (body) => {
-		const response = await fetch(`${running.base}/api/images/session`, { method: 'POST', headers: { origin: running.base, 'content-type': 'application/json' }, body: JSON.stringify(body) });
-		assert.equal(response.status, 200); return response.json();
-	};
 	const imageView = async (id) => (await fetch(`${running.base}/api/images/session?worldId=${id}`)).json();
-	const completedImages = async (id, count) => {
-		for (let attempt = 0; attempt < 150; attempt++) { const view = await imageView(id); if (view.illustrations.filter((entry) => entry.status === 'completed').length === count) return view; await pause(20); }
-		assert.fail('illustrations did not complete');
-	};
 	try {
-		await post(running.base, 'createWorld', { name: 'Image conditions integration', description: 'A quiet empty theater.' }, '/lores');
+		await post(running.base, 'createWorld', { name: 'Lorebook image integration', description: 'A quiet empty theater.' }, '/lores');
 		const id = db.prepare("SELECT value FROM theater_meta WHERE key='active'").get().value;
 		const saved = await fetch(`${running.base}/api/image-presets`, { method: 'POST', headers: { origin: running.base, 'content-type': 'application/json' }, body: JSON.stringify({ revision: 0, name: 'Image test style', config: { provider: 'openai', baseUrl: `http://127.0.0.1:${port}/v1`, apiKeyEnv: 'NEWERA_INTEGRATION_IMAGE_KEY', model: 'image-model', options: {}, stylePrompt: 'Watercolor.' } }) });
 		assert.equal(saved.status, 200); const { savedId } = await saved.json();
 		await post(running.base, 'imagePreset', { worldId: id, imagePresetId: savedId });
-		const baseRule = { enabled: true, minutes: 5, cooldownMinutes: 0, sceneId: '', entityId: '', state: null, naturalLanguage: '', prompt: '' };
-		await imagePost({ worldId: id, operation: 'save', revision: 0, config: { enabled: true, rules: [{ ...baseRule, id: 'interval', name: 'Every five minutes', when: 'interval' }, { ...baseRule, id: 'quiet', name: 'A quiet scene', when: 'condition', naturalLanguage: '현재 장면이 조용하다.' }] } });
+		await post(running.base, 'settings', { worldId: id, revision: '0', name: 'Lorebook image integration', description: 'A quiet empty theater.', rules: '', imageConditions: '첫 장면에서만 한 장을 생성한다.', imagePromptFormat: 'tags', imagePromptInstructions: '태그를 작성한다.' }, '/lores');
+		await fetch(running.base);
 		const turn = async () => { const { revision } = db.prepare('SELECT revision FROM theater_worlds WHERE id=?').get(id); await post(running.base, 'turn', { worldId: id, revision: String(revision), kind: 'wait' }); await waitJob(running.base, db, id); };
-		await turn(); let view = await completedImages(id, 1); assert.equal(imageCalls, 1); assert.equal(semanticCalls, 1); assert.match(view.illustrations[0].reason, /Every five minutes.*A quiet scene/);
+		await turn(); let view;
+		for (let attempt = 0; attempt < 150; attempt++) { view = await imageView(id); if (view.illustrations[0]?.status === 'completed') break; await pause(20); }
+		assert.equal(view.illustrations[0]?.status, 'completed'); assert.equal(imageCalls, 1); assert.equal(promptCalls, 1); assert.equal(decisions, 1);
 		const image = await fetch(`${running.base}/api/images/illustrations/${view.illustrations[0].id}`); assert.equal(image.headers.get('content-type'), 'image/png'); assert.deepEqual(Buffer.from(await image.arrayBuffer()), png);
-		await turn(); view = await completedImages(id, 2); assert.equal(imageCalls, 2); assert.equal(view.illustrations[1].reason, 'Every five minutes');
+		await turn(); for (let attempt = 0; attempt < 100 && decisions < 2; attempt++) { await imageView(id); await pause(10); }
+		assert.equal(decisions, 2); assert.equal(promptCalls, 1, 'skip must not write a prompt'); assert.equal(imageCalls, 1);
 		assert.ok(!JSON.stringify(view).includes('private-test-image-key')); assert.ok(!JSON.stringify(view.illustrations).includes('apiKeyEnv'));
+		const bundle = await exported(running.base, id); assert.equal(bundle.world.definition.imageGeneration.promptFormat, 'tags'); assert.ok(!JSON.stringify(bundle).includes(savedId));
 		await running.stop(); running = await app(directory, `http://127.0.0.1:${port}/v1`, { NEWERA_INTEGRATION_IMAGE_KEY: 'private-test-image-key' });
-		assert.equal((await imageView(id)).illustrations.length, 2); await pause(100); assert.equal(imageCalls, 2);
+		assert.equal((await imageView(id)).illustrations.length, 1); await pause(60); assert.equal(imageCalls, 1);
 		await post(running.base, 'reset', { worldId: id, revision: String(db.prepare('SELECT revision FROM theater_worlds WHERE id=?').get(id).revision) });
-		view = await imageView(id); assert.equal(view.illustrations.length, 0); assert.equal(view.settings.config.enabled, true); assert.equal(imageCalls, 2);
+		assert.equal((await imageView(id)).illustrations.length, 0); assert.equal((await exported(running.base, id)).world.definition.imageGeneration.conditions, '첫 장면에서만 한 장을 생성한다.');
 	} finally { await running.stop(); db.close(); model.closeAllConnections(); await new Promise((resolve) => model.close(resolve)); }
 });
 

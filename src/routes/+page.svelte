@@ -13,14 +13,13 @@
 	import type { PageProps } from './$types';
 	import CharacterIntroduction from '$lib/components/CharacterIntroduction.svelte';
 	import ProviderManager from '$lib/components/ProviderManager.svelte';
-	import SessionImageSettings from '$lib/components/SessionImageSettings.svelte';
+	import SessionImagePreset from '$lib/components/SessionImagePreset.svelte';
 	import IllustrationCard from '$lib/components/IllustrationCard.svelte';
 	import type { ModelOption } from '$lib/providers/types';
 	let { data, form }: PageProps = $props();
 	let submitting = $state(false);
 	let targetId = $state('');
 	let modelsDialog = $state<HTMLDialogElement>();
-	let imagesDialog = $state<HTMLDialogElement>();
 	let resetDialog = $state<HTMLDialogElement>();
 	let resetError = $state('');
 	let historyElement = $state<HTMLDivElement>();
@@ -164,7 +163,7 @@
 	$effect(() => {
 		const current = illustrationRevision;
 		const worldId = world.id;
-		if (!data.illustrations.some((entry) => ['pending', 'checking', 'generating'].includes(entry.status))) return;
+		if (!data.illustrations.some((entry) => ['pending', 'checking', 'prompting', 'generating'].includes(entry.status))) return;
 		const controller = new AbortController();
 		let stopped = false;
 		let timer: ReturnType<typeof setTimeout>;
@@ -188,16 +187,11 @@
 <header class="topbar">
  <a class="brand" href="/">newera<span>THEATER</span></a>
  <nav class="session-actions" aria-label="세션 관리">
-  <button type="button" onclick={() => imagesDialog?.showModal()}>이미지 설정</button>
   <button type="button" onclick={() => { modelsDialog?.showModal(); if (!modelCatalog) void loadModels(); }}>모델 설정</button>
   <button type="button" onclick={() => { resetError = ''; resetDialog?.showModal(); }}>처음부터 다시</button>
   <a class="top-link" href="/lores">세계관과 무대 편집 ↗</a>
  </nav>
 </header>
-<dialog class="session-dialog" aria-label="이미지 설정" bind:this={imagesDialog}>
- <form method="dialog" class="dialog-close"><button aria-label="이미지 설정 닫기">닫기</button></form>
- {#key world.id}<SessionImageSettings {world} presets={data.imagePresets} settings={data.imageTriggers} illustrationCount={data.illustrations.length} />{/key}
-</dialog>
 <dialog class="session-dialog" aria-labelledby="models-dialog-title" bind:this={modelsDialog}>
  <form method="dialog" class="dialog-close"><button aria-label="모델 설정 닫기">닫기</button></form>
 		<div class="model-settings">
@@ -220,6 +214,7 @@
 			</form>
 			{#if modelsError}<p class="feedback error" role="alert">{modelsError}</p>{/if}
 			{#each modelCatalog?.errors ?? [] as message}<p class="feedback error">{message}</p>{/each}
+			{#key world.id}<SessionImagePreset {world} presets={data.imagePresets} count={data.illustrations.length} />{/key}
 			<button type="button" class="provider-toggle" onclick={() => { providerManagerOpen = !providerManagerOpen; }}>{providerManagerOpen ? 'Provider 관리 접기' : 'Provider 관리'}</button>
 			{#if providerManagerOpen}<ProviderManager onsaved={loadModels} />{/if}
 		</div>

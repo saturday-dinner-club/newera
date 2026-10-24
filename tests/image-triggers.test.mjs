@@ -5,158 +5,136 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { exampleWorld } from '../src/lib/theater/fixtures.ts';
 import { initialState } from '../src/lib/theater/runtime.ts';
-import { checkedImageTriggers, eligibleImageRule, evaluateImageRules, imageSceneSnapshot, imageTriggerCursor, newImageRule } from '../src/lib/images/triggers.ts';
+import { validateDefinition } from '../src/lib/theater/validation.ts';
+import { imageSceneSnapshot, imageGenerationPolicy } from '../src/lib/images/triggers.ts';
+import { buildBundle } from '../skills/newera-lore-authoring/scripts/lore-format.mjs';
 
-const directory = mkdtempSync(join(tmpdir(), 'newera-image-triggers-'));
+const directory = mkdtempSync(join(tmpdir(), 'newera-lore-images-'));
 process.env.NEWERA_DATA_DIR = directory;
-process.env.NEWERA_IMAGE_TRIGGER_TEST_KEY = 'private-image-trigger-key';
+process.env.NEWERA_LORE_IMAGE_KEY = 'private-lore-image-key';
 const stage = await import('../src/lib/server/stage-store.ts');
 const presets = await import('../src/lib/server/images/presets.ts');
-const triggers = await import('../src/lib/server/images/trigger-store.ts');
+const images = await import('../src/lib/server/images/trigger-store.ts');
 const { processImageCheck } = await import('../src/lib/server/images/trigger-worker.ts');
-const { judgeImageConditions } = await import('../src/lib/server/oev.ts');
 const nativeFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = nativeFetch; });
 test.after(() => { stage.store().close(); rmSync(directory, { recursive: true, force: true }); });
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', 'base64');
-const config = { provider: 'openai', baseUrl: 'https://images.example.test/v1', apiKeyEnv: 'NEWERA_IMAGE_TRIGGER_TEST_KEY', model: 'first-image-model', options: {}, stylePrompt: 'Watercolor.' };
-const preset = presets.saveImagePreset({ revision: 0, name: 'Trigger style', config });
-const rule = (extra = {}) => ({ ...newImageRule(), ...extra });
-const pureWorld = () => { const definition = exampleWorld(); return { id: 'world', revision: 0, definition, state: initialState(definition) }; };
-const createWorld = (rules, enabled = true) => {
-	const id = stage.importWorld(JSON.stringify({ format: 'newera-theater', version: 2, world: { definition: exampleWorld() }, saves: [] }));
-	stage.setWorldImagePreset(id, preset.id);
-	triggers.saveImageTriggers(id, 0, { enabled, rules });
+const config = { provider: 'openai', baseUrl: 'https://images.example.test/v1', apiKeyEnv: 'NEWERA_LORE_IMAGE_KEY', model: 'image-model', options: {}, stylePrompt: 'Watercolor.' };
+const preset = presets.saveImagePreset({ revision: 0, name: 'Unchanged image preset', config });
+const policy = (extra = {}) => ({ conditions: '새 장소 또는 중요한 만남이 생기거나 마지막 삽화 이후 게임 내 30분이 지났으면 새 삽화를 요청한다.', promptFormat: 'natural', promptInstructions: '영어로 현재 차림과 표정을 묘사한다.', ...extra });
+const createWorld = (imageGeneration = policy()) => {
+	const definition = { ...exampleWorld(), imageGeneration };
+	const id = stage.importWorld(JSON.stringify({ format: 'newera-theater', version: 2, world: { definition }, saves: [] }));
+	stage.setWorldImagePreset(id, preset.id); stage.setWorldModels(id, { decisionModel: 'judge-model', textModel: 'writer-model' });
+	assert.equal(images.queueImageCheck(id), null, 'selection/lore edits establish a baseline without generating');
 	return id;
 };
-const advance = (id, minutes = 1, mutate = () => {}) => stage.editWorld(id, stage.getWorld(id).revision, (world) => {
-	world.state.minute += minutes; world.state.day += Math.floor(world.state.minute / 1440); world.state.minute %= 1440; world.state.tick++; mutate(world);
-});
-const queuedJob = (id, manual = false) => {
-	const jobId = triggers.queueImageCheck(id, manual); assert.ok(jobId);
-	const row = stage.store().prepare('SELECT * FROM theater_illustrations WHERE id = ?').get(jobId);
-	return { id: jobId, worldId: id, settingsRevision: row.settings_revision, input: JSON.parse(row.input_json) };
-};
-const finish = async (id, manual = false) => { const job = queuedJob(id, manual); await processImageCheck(job); return triggers.listIllustrations(id).find((entry) => entry.id === job.id); };
-
-test('story minutes cross midnight; scene and interval rules coalesce; cooldown does not delay a first condition', () => {
-	const world = pureWorld(); world.state.minute = 1435;
-	const cursor = imageTriggerCursor(world);
-	const rules = [rule({ when: 'interval', minutes: 10 }), rule({ when: 'scene' })];
-	world.state.day++; world.state.minute = 5; world.state.activeSceneId = 'stage'; world.revision++;
-	const result = evaluateImageRules(rules, imageSceneSnapshot(world, rules), cursor, {});
-	assert.equal(result.fired.length, 2);
-	assert.equal(evaluateImageRules(rules, imageSceneSnapshot(world, rules), result.cursor, {}).fired.length, 0);
-	const first = rule({ when: 'condition', sceneId: 'stage', cooldownMinutes: 30 });
-	assert.equal(eligibleImageRule(first, imageSceneSnapshot(world, [first]), cursor), true);
-});
-
-test('explicit conditions are ANDed, preserve JSON value types and require targets in the current scene', () => {
-	const world = pureWorld(); const entity = world.state.instances[0]; entity.state.lit = true;
-	const rules = [rule({ when: 'condition', sceneId: entity.sceneId, entityId: entity.id, state: { entityId: entity.id, key: 'lit', equals: true } })];
-	world.state.activeSceneId = entity.sceneId;
-	assert.equal(imageSceneSnapshot(world, rules).guards[rules[0].id], true);
-	rules[0].state.equals = 'true'; assert.equal(imageSceneSnapshot(world, rules).guards[rules[0].id], false);
-	rules[0].state.equals = true; entity.active = false; assert.equal(imageSceneSnapshot(world, rules).guards[rules[0].id], false);
-});
-
-test('condition rules fire only on false to true, including a semantic condition', () => {
-	const world = pureWorld(); const entry = rule({ when: 'condition', naturalLanguage: '두 사람이 우산을 함께 든다.' });
-	const scene = imageSceneSnapshot(world, [entry]); let cursor = imageTriggerCursor(world);
-	let result = evaluateImageRules([entry], scene, cursor, { [entry.id]: true }); assert.equal(result.fired.length, 1); cursor = result.cursor;
-	result = evaluateImageRules([entry], scene, cursor, { [entry.id]: true }); assert.equal(result.fired.length, 0); cursor = result.cursor;
-	result = evaluateImageRules([entry], scene, cursor, { [entry.id]: false }); assert.equal(result.fired.length, 0); cursor = result.cursor;
-	assert.equal(evaluateImageRules([entry], scene, cursor, { [entry.id]: true }).fired.length, 1);
-});
-
-test('scene snapshots exclude private state, memories, goals, personality and relationship impressions', () => {
-	const world = pureWorld(); world.state.instances[0].state.secret = 'private-state'; world.state.instances[0].memo = { summary: 'private-memo' }; world.state.instances[0].memories = [{ text: 'private-memory' }];
-	world.definition.rules = 'private-rules'; world.definition.templates[0].personality = 'private-personality';
-	const snapshot = JSON.stringify(imageSceneSnapshot(world, []));
-	for (const marker of ['private-state', 'private-memo', 'private-memory', 'private-rules', 'private-personality']) assert.ok(!snapshot.includes(marker));
-});
-
-test('rule validation rejects unbounded, malformed, duplicate and unknown entity conditions', () => {
-	for (const entry of [rule({ minutes: 0 }), rule({ cooldownMinutes: -1 }), rule({ when: 'condition' }), rule({ id: '__proto__' }), rule({ state: { entityId: 'x', key: 'x', equals: {} } }), rule({ sceneId: 'missing' })]) assert.throws(() => checkedImageTriggers({ enabled: true, rules: [entry] }, pureWorld()));
-	const duplicate = rule(); assert.throws(() => checkedImageTriggers({ enabled: true, rules: [duplicate, duplicate] }));
-	assert.throws(() => checkedImageTriggers({ enabled: true, rules: Array.from({ length: 11 }, () => rule()) }));
-});
-
-test('settings are isolated, revision guarded, disabled by default and retained across reset/slots but excluded from exports', () => {
-	const id = createWorld([rule({ when: 'interval' })]); const other = stage.createWorld('No automatic images', 'No image settings yet.');
-	assert.deepEqual(triggers.getImageTriggers(other), { revision: 0, config: { enabled: false, rules: [] } });
-	assert.throws(() => triggers.saveImageTriggers(other, 0, { enabled: true, rules: [] }), /프리셋/);
-	assert.equal(triggers.queueImageCheck(other), null);
-	assert.throws(() => triggers.saveImageTriggers(id, 0, { enabled: false, rules: [] }), /변경/);
-	stage.saveWorld(id, 1); stage.resetWorld(id, stage.getWorld(id).revision); stage.loadWorld(id, stage.getWorld(id).revision, 1);
-	assert.equal(triggers.getImageTriggers(id).config.rules.length, 1);
-	assert.ok(!stage.exportWorld(id).includes('cooldownMinutes'));
-	assert.equal(triggers.queueImageCheck(id), null, 'reset establishes a new time baseline');
-	const invalidModel = createWorld([rule({ when: 'condition', naturalLanguage: '장면이 조용하다.' })]);
-	const previousTimeout = process.env.NEWERA_LLM_TIMEOUT_MS;
-	process.env.NEWERA_LLM_TIMEOUT_MS = '0';
-	try {
-		advance(invalidModel); assert.ok(triggers.queueImageCheck(invalidModel), 'invalid image judgment config must not break scene requests');
-		assert.equal(triggers.listIllustrations(invalidModel)[0].status, 'failed');
-	} finally { if (previousTimeout === undefined) delete process.env.NEWERA_LLM_TIMEOUT_MS; else process.env.NEWERA_LLM_TIMEOUT_MS = previousTimeout; }
-});
-
-test('automatic interval work captures the preset, consumes the trigger and stores bytes without exposing config', async () => {
-	const calls = []; globalThis.fetch = async (url, init) => { calls.push(JSON.parse(init.body)); return Response.json({ data: [{ b64_json: png.toString('base64') }] }); };
-	const id = createWorld([rule({ when: 'interval', minutes: 10, prompt: 'Emphasize the umbrella.' })]);
-	advance(id, 10); const job = queuedJob(id);
-	presets.saveImagePreset({ ...preset, name: preset.name, config: { ...config, model: 'later-image-model' } });
-	await processImageCheck(job);
-	assert.equal(calls[0].model, 'first-image-model'); assert.ok(calls[0].prompt.startsWith('Watercolor.')); assert.ok(calls[0].prompt.includes('Emphasize the umbrella.'));
-	assert.equal(triggers.queueImageCheck(id), null);
-	const images = triggers.listIllustrations(id); assert.equal(images[0].status, 'completed'); assert.ok(!JSON.stringify(images).includes('private-image-trigger-key')); assert.ok(!JSON.stringify(images).includes('apiKeyEnv'));
-	const row = stage.store().prepare('SELECT bytes,media_type,input_json FROM theater_illustrations WHERE id = ?').get(job.id); assert.deepEqual(Buffer.from(row.bytes), png); assert.equal(row.media_type, 'image/png'); assert.ok(!row.input_json.includes('private-image-trigger-key'));
-	advance(id, 1); await finish(id); assert.equal(calls.length, 1, 'interval cursor prevents a call on every turn');
-});
-
-test('semantic checks are batched, use the text model and fail closed on malformed replies', async () => {
-	const requests = [];
-	globalThis.fetch = async (url, init) => { const body = JSON.parse(init.body); requests.push(body); return Response.json({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({ matches: [{ id: 'a', matched: true }, { id: 'b', matched: false }] }) } }] }); };
-	const previousTimeout = process.env.NEWERA_LLM_TIMEOUT_MS;
-	process.env.NEWERA_LLM_TIMEOUT_MS = '1800000';
-	try { assert.deepEqual(await judgeImageConditions([{ id: 'a', condition: 'rain' }, { id: 'b', condition: 'sun' }], 'visible-scene-only', { textModel: 'custom-text-model', decisionModel: 'decision' }, new AbortController().signal), { a: true, b: false }); }
-	finally { if (previousTimeout === undefined) delete process.env.NEWERA_LLM_TIMEOUT_MS; else process.env.NEWERA_LLM_TIMEOUT_MS = previousTimeout; }
-	assert.equal(requests[0].model, 'custom-text-model'); assert.equal(requests[0].response_format.json_schema.name, 'image_conditions');
-	const badRules = [rule({ when: 'condition', naturalLanguage: '공연이 시작된다.' })]; const id = createWorld(badRules); advance(id);
-	const failed = await finish(id); assert.equal(failed.status, 'failed'); assert.equal(requests.length, 2, 'only one judgment call, no image call or automatic retries');
-});
-
-test('natural and explicit guards combine; continuous true does not cause repeated images', async () => {
-	const semantic = rule({ when: 'condition', sceneId: 'lobby', naturalLanguage: '장면이 조용하다.' }); const id = createWorld([semantic]);
-	let matches = true; let imageCalls = 0; let judgmentCalls = 0;
+const advance = (id, minutes = 5, operation = () => {}) => stage.editWorld(id, stage.getWorld(id).revision, world => { world.state.minute += minutes; world.state.day += Math.floor(world.state.minute / 1440); world.state.minute %= 1440; world.state.tick++; operation(world); });
+const queue = (id) => { const jobId = images.queueImageCheck(id); assert.ok(jobId); const row = stage.store().prepare('SELECT * FROM theater_illustrations WHERE id=?').get(jobId); return { id: jobId, worldId: id, settingsRevision: row.settings_revision, input: JSON.parse(row.input_json) }; };
+const choice = (value = 'generate') => ({ answers: { image_generation: { type: 'choice', choice: value } } });
+const completion = value => ({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(value) } }] });
+function mockPipeline({ decision = 'generate', prompt = 'A quiet theater entrance after rain.', imageStatus = 200 } = {}) {
+	const calls = [];
 	globalThis.fetch = async (url, init) => {
-		if (String(url).endsWith('/images/generations')) { imageCalls++; return Response.json({ data: [{ b64_json: png.toString('base64') }] }); }
-		judgmentCalls++; return Response.json({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({ matches: [{ id: semantic.id, matched: matches }] }) } }] });
+		const body = JSON.parse(init.body); calls.push({ path: new URL(url).pathname, body });
+		if (String(url).endsWith('/systemone')) return Response.json(choice(decision));
+		if (String(url).endsWith('/chat/completions')) return Response.json(completion({ prompt }));
+		return imageStatus === 200 ? Response.json({ data: [{ b64_json: png.toString('base64') }] }) : new Response('private-lore-image-key', { status: imageStatus });
 	};
-	advance(id); await finish(id); assert.equal(imageCalls, 1);
-	advance(id); await finish(id); assert.equal(imageCalls, 1);
-	matches = false; advance(id); await finish(id); assert.equal(imageCalls, 1);
-	matches = true; advance(id); await finish(id); assert.equal(imageCalls, 2);
-	advance(id, 1, (world) => { world.state.activeSceneId = 'stage'; for (const entity of world.state.instances) if (entity.companion) entity.sceneId = 'stage'; }); await finish(id); assert.equal(judgmentCalls, 4, 'false explicit guards do not invoke a semantic model');
+	return calls;
+}
+
+test('lorebook image conditions and prompt format validate, round-trip through authoring, export, slots and import', () => {
+	assert.equal(validateDefinition(exampleWorld()).imageGeneration, undefined, 'old version 2 lorebooks stay valid');
+	for (const imageGeneration of [policy({ promptFormat: 'other' }), policy({ conditions: 'x'.repeat(8001) }), policy({ promptInstructions: 'x'.repeat(4001) }), { ...policy(), apiKey: 'no' }]) assert.throws(() => validateDefinition({ ...exampleWorld(), imageGeneration }));
+	const bundle = buildBundle({ format: 'newera-theater-source', version: 2, definition: { ...exampleWorld(), imageGeneration: policy({ promptFormat: 'tags' }) } });
+	assert.equal(bundle.world.definition.imageGeneration.promptFormat, 'tags');
+	const id = createWorld(policy({ promptFormat: 'tags' })); stage.saveWorld(id, 1);
+	stage.editWorld(id, stage.getWorld(id).revision, world => { world.definition.imageGeneration.conditions = ''; });
+	stage.loadWorld(id, stage.getWorld(id).revision, 1); assert.equal(stage.getWorld(id).definition.imageGeneration.conditions, policy().conditions);
+	const exported = stage.exportWorld(id); assert.ok(exported.includes('promptInstructions')); assert.ok(!exported.includes(preset.id));
+	const imported = stage.importWorld(exported); assert.deepEqual(stage.getWorld(imported).definition.imageGeneration, policy({ promptFormat: 'tags' })); assert.equal(stage.getWorld(imported).imagePresetId, null);
 });
 
-test('failures consume the trigger and interrupted billable requests are not replayed after recovery', async () => {
-	let calls = 0; globalThis.fetch = async () => { calls++; return new Response('private-image-trigger-key', { status: 500 }); };
-	const id = createWorld([rule({ when: 'interval', minutes: 5 })]); advance(id, 5);
-	const image = await finish(id); assert.equal(image.status, 'failed'); assert.equal(calls, 1); assert.ok(!image.error.includes('private-image-trigger-key')); assert.equal(triggers.queueImageCheck(id), null);
-	advance(id); await finish(id); assert.equal(calls, 1);
-	const manual = queuedJob(id, true); triggers.setImageCheckStatus(manual.id, 'generating'); triggers.recoverImageChecks();
-	assert.equal(triggers.listIllustrations(id).find((entry) => entry.id === manual.id).status, 'failed');
-	assert.notEqual(triggers.pendingImageCheck()?.id, manual.id);
+test('blank lore conditions and no image selection do no inference; old session rules are ignored', () => {
+	globalThis.fetch = async () => assert.fail('must not fetch');
+	const id = createWorld(policy({ conditions: '' }));
+	stage.store().prepare('UPDATE theater_image_settings SET config_json=? WHERE world_id=?').run(JSON.stringify({ enabled: true, rules: [{ when: 'interval', minutes: 1 }] }), id);
+	advance(id); assert.equal(images.queueImageCheck(id), null);
+	assert.deepEqual(presets.getImagePreset(preset.id).config, config, 'preset settings are preserved');
+	stage.setWorldImagePreset(id, null); assert.equal(images.queueImageCheck(id), null);
 });
 
-test('disabling settings fences pending semantic work; clearing or resetting discards a late image response', async () => {
-	let release; let calls = 0;
-	globalThis.fetch = async () => { calls++; return await new Promise((resolve) => { release = () => resolve(Response.json({ data: [{ b64_json: png.toString('base64') }] })); }); };
-	const id = createWorld([rule({ when: 'interval', minutes: 1 })]); advance(id); const stale = queuedJob(id);
-	triggers.saveImageTriggers(id, 1, { enabled: false, rules: [] }); await processImageCheck(stale); assert.equal(calls, 0);
-	const manual = queuedJob(id, true); const pending = processImageCheck(manual); await new Promise(resolve => setTimeout(resolve, 0));
-	triggers.clearIllustrations(id); release(); await pending; assert.deepEqual(triggers.listIllustrations(id), []);
-	const another = queuedJob(id, true); const resetting = processImageCheck(another); await new Promise(resolve => setTimeout(resolve, 0));
-	stage.resetWorld(id, stage.getWorld(id).revision); release(); await resetting; assert.deepEqual(triggers.listIllustrations(id), []);
+test('public prompt context excludes private character state while System One can inspect visible object state', () => {
+	const definition = exampleWorld(); const world = { id: 'privacy', revision: 0, definition, state: initialState(definition) };
+	const character = world.state.instances.find(entity => definition.templates.find(template => template.id === entity.templateId).kind === 'character');
+	character.state.secret = 'private-state'; character.memo = { summary: 'private-memo' }; character.memories = [{ text: 'private-memory' }];
+	const scene = imageSceneSnapshot(world);
+	for (const marker of ['private-state', 'private-memo', 'private-memory']) assert.ok(!JSON.stringify(scene).includes(marker));
+	assert.ok(!scene.context.includes('objectStates')); assert.deepEqual(imageGenerationPolicy({ ...world, definition: exampleWorld() }), { conditions: '', promptFormat: 'natural', promptInstructions: '' });
+});
+
+test('System One skip performs neither prompt generation nor image API requests and is not reevaluated on refresh', async () => {
+	const calls = mockPipeline({ decision: 'skip' }); const id = createWorld(); advance(id);
+	await processImageCheck(queue(id));
+	assert.deepEqual(calls.map(call => call.path), ['/v1/systemone']); assert.equal(calls[0].body.model, 'judge-model');
+	assert.equal(calls[0].body.questions.image_generation.type, 'choice'); assert.deepEqual(Object.keys(calls[0].body.questions.image_generation.criteria), ['generate', 'skip']);
+	assert.equal(calls[0].body.state.imageGeneration.conditions, policy().conditions);
+	assert.equal(images.queueImageCheck(id), null); assert.deepEqual(images.listIllustrations(id), []);
+	advance(id, 25); await processImageCheck(queue(id));
+	assert.equal(calls[1].body.state.elapsedMinutes, 30, 'skipped checks must not restart the elapsed-time baseline');
+});
+
+test('affirmative System One decision precedes a generated natural prompt and the selected image preset', async () => {
+	const calls = mockPipeline(); const id = createWorld(); advance(id); const job = queue(id); await processImageCheck(job);
+	assert.deepEqual(calls.map(call => call.path), ['/v1/systemone', '/v1/chat/completions', '/v1/images/generations']);
+	assert.equal(calls[1].body.model, 'writer-model'); assert.equal(calls[1].body.response_format.json_schema.name, 'image_prompt');
+	assert.equal(calls[2].body.model, 'image-model'); assert.equal(calls[2].body.prompt, 'Watercolor.\n\nA quiet theater entrance after rain.');
+	assert.ok(!calls[2].body.prompt.includes('recentEvents'), 'raw JSON scene is never sent as an image prompt');
+	const row = stage.store().prepare('SELECT bytes,media_type,input_json FROM theater_illustrations WHERE id=?').get(job.id);
+	assert.deepEqual(Buffer.from(row.bytes), png); assert.equal(row.media_type, 'image/png'); assert.ok(!row.input_json.includes('private-lore-image-key'));
+	assert.equal(images.listIllustrations(id)[0].status, 'completed'); assert.equal(images.queueImageCheck(id), null);
+});
+
+test('tag format is passed to the writer and elapsed game minutes and the last image request reach System One', async () => {
+	const calls = mockPipeline({ prompt: 'theater, rain, red umbrella' }); const id = createWorld(policy({ promptFormat: 'tags' })); advance(id); await processImageCheck(queue(id));
+	assert.ok(calls[1].body.messages[0].content.includes('쉼표로 구분한 이미지 생성 태그'));
+	const writer = JSON.parse(calls[1].body.messages[1].content); assert.equal(writer.promptFormat, 'tags'); assert.equal(writer.promptInstructions, policy().promptInstructions); assert.ok(!('objectStates' in writer));
+	advance(id, 30); await processImageCheck(queue(id)); const state = calls[3].body.state;
+	assert.equal(state.elapsedMinutes, 30); assert.equal(state.previousRequest.prompt, 'theater, rain, red umbrella');
+});
+
+test('invalid decision, malformed prompt and empty prompt fail closed without an image call', async () => {
+	for (const invalid of ['decision', 'malformed', 'empty']) {
+		const calls = []; globalThis.fetch = async (url, init) => { calls.push(String(url)); if (String(url).endsWith('/systemone')) return Response.json(choice(invalid === 'decision' ? 'anything' : 'generate')); return Response.json(completion(invalid === 'malformed' ? { unexpected: 'field' } : { prompt: '' })); };
+		const id = createWorld(); advance(id); await processImageCheck(queue(id));
+		assert.equal(images.listIllustrations(id)[0].status, 'failed'); assert.ok(calls.every(url => !url.endsWith('/images/generations'))); assert.equal(images.queueImageCheck(id), null);
+	}
+});
+
+test('model and image preset snapshots apply to accepted jobs; failures are not automatically replayed', async () => {
+	const calls = mockPipeline({ imageStatus: 500 }); const id = createWorld(); advance(id); const job = queue(id);
+	stage.setWorldModels(id, { decisionModel: 'next-judge', textModel: 'next-writer' });
+	presets.saveImagePreset({ ...preset, config: { ...config, model: 'next-image' } });
+	await processImageCheck(job); assert.equal(calls[0].body.model, 'judge-model'); assert.equal(calls[1].body.model, 'writer-model'); assert.equal(calls[2].body.model, 'image-model');
+	assert.equal(images.listIllustrations(id)[0].status, 'failed'); assert.ok(!images.listIllustrations(id)[0].error.includes('private-lore-image-key')); assert.equal(images.queueImageCheck(id), null);
+});
+
+test('lore edits fence an in-flight decision and editor changes alone do not request a new image', async () => {
+	const id = createWorld(); stage.editWorld(id, stage.getWorld(id).revision, world => { world.definition.name += ' edited'; }); assert.equal(images.queueImageCheck(id), null);
+	advance(id); const job = queue(id); let release; let calls = 0;
+	globalThis.fetch = async () => { calls++; return await new Promise(resolve => { release = () => resolve(Response.json(choice())); }); };
+	const pending = processImageCheck(job); await new Promise(resolve => setTimeout(resolve, 0));
+	stage.editWorld(id, stage.getWorld(id).revision, world => { world.definition.imageGeneration.conditions = ''; }); release(); await pending;
+	assert.equal(calls, 1); assert.deepEqual(images.listIllustrations(id), []);
+});
+
+test('reset and record clearing discard late image responses; interrupted work is not replayed after restart', async () => {
+	const id = createWorld(); let release;
+	globalThis.fetch = async (url) => String(url).endsWith('/systemone') ? Response.json(choice()) : String(url).endsWith('/chat/completions') ? Response.json(completion({ prompt: 'theater' })) : await new Promise(resolve => { release = () => resolve(Response.json({ data: [{ b64_json: png.toString('base64') }] })); });
+	advance(id); const pending = processImageCheck(queue(id)); await new Promise(resolve => setTimeout(resolve, 0));
+	stage.resetWorld(id, stage.getWorld(id).revision); release(); await pending; assert.deepEqual(images.listIllustrations(id), []); assert.equal(stage.getWorld(id).definition.imageGeneration.conditions, policy().conditions);
+	advance(id); const interrupted = queue(id); images.setImageCheckStatus(interrupted.id, 'prompting'); images.recoverImageChecks(); assert.equal(images.listIllustrations(id)[0].status, 'failed'); assert.notEqual(images.pendingImageCheck()?.id, interrupted.id);
+	images.clearIllustrations(id); assert.deepEqual(images.listIllustrations(id), []); assert.equal(images.queueImageCheck(id), null);
 });

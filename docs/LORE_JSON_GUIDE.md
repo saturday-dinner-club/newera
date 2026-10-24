@@ -10,6 +10,8 @@
 
 ## 파일 구성
 
+선택적 `world.definition.imageGeneration`은 로어북의 이미지 생성 지침이다. `{ "conditions": "새 장소나 중요한 만남을 그린다. 마지막 요청 이후 게임 내 30분 간격을 둔다.", "promptFormat": "tags", "promptInstructions": "현재 겉모습을 영어 태그로 작성한다." }`처럼 지정한다. `conditions`는 최대 8000자, `promptInstructions`는 최대 4000자이며 `promptFormat`은 `tags` 또는 `natural`이다. 조건이 비어 있거나 생략되면 자동 이미지를 요청하지 않는다. 판단 모델의 System One 생성/생략 선택 후에만 생성 모델이 프롬프트를 작성한다. 이미지 프리셋 선택은 세션의 모델 설정에 따로 저장한다. 이 지침은 원본 빌더·저장 슬롯·내보내기·가져오기에 보존한다.
+
 ```json
 {
   "format": "newera-theater",

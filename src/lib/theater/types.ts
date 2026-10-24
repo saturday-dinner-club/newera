@@ -81,12 +81,19 @@ export interface CharacterReflection {
 	relationshipUpdates: RelationshipUpdate[];
 	memoUpdate: CharacterMemo | null;
 }
+export interface ImageGenerationPolicy {
+	/** Lorebook instructions interpreted by the System One decision model. Empty disables automatic images. */
+	conditions: string;
+	promptFormat: 'tags' | 'natural';
+	promptInstructions: string;
+}
 export interface WorldDefinition {
 	name: string;
 	description: string;
 	rules: string;
 	/** Expression guidance for generated narration and dialogue; does not alter action rules. */
 	writingStyle?: string;
+	imageGeneration?: ImageGenerationPolicy;
 	startingSceneId: string;
 	scenes: Scene[];
 	templates: EntityTemplate[];

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Illustration } from '$lib/images/triggers';
 	let { illustration, onImageLoad }: { illustration: Illustration; onImageLoad?: () => void } = $props();
-	const statusLabels = { pending: '삽화 조건 확인 대기', checking: '삽화 조건 판단 중…', generating: '삽화를 그리고 있습니다…', completed: '장면 삽화', failed: '삽화 생성 실패', skipped: '' };
+	const statusLabels = { pending: '삽화 판단 대기', checking: 'System One으로 삽화 판단 중…', prompting: '이미지 프롬프트 작성 중…', generating: '삽화를 그리고 있습니다…', completed: '장면 삽화', failed: '삽화 생성 실패', skipped: '' };
 </script>
 <figure class="illustration" aria-label="장면 삽화 기록">
 	{#if illustration.status === 'completed'}<img src={`/api/images/illustrations/${encodeURIComponent(illustration.id)}`} alt={`${illustration.reason} · 장면 삽화`} onload={onImageLoad} />{/if}

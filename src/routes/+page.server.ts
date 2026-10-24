@@ -6,12 +6,12 @@ import { ensureStageWorker, queueStageTurn, retryStageTurn } from '$lib/server/s
 import { getModelCatalog, modelSettings } from '$lib/server/oev';
 import { checkedModelSelection } from '$lib/theater/validation';
 import { resolveProviderSnapshot } from '$lib/server/providers';
-import { getImageTriggers, listIllustrations } from '$lib/server/images/trigger-store';
+import { listIllustrations } from '$lib/server/images/trigger-store';
 
 export const load: PageServerLoad = () => {
 	ensureStageWorker();
 	const view = getStageView();
-	return { ...view, imageTriggers: getImageTriggers(view.world.id), illustrations: listIllustrations(view.world.id), imagePresets: listImagePresets().map(({ id, name, revision, provider }) => ({ id, name, revision, provider })) };
+	return { ...view, illustrations: listIllustrations(view.world.id), imagePresets: listImagePresets().map(({ id, name, revision, provider }) => ({ id, name, revision, provider })) };
 };
 
 function failed(error: unknown) {
