@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import { test } from 'node:test';
 import { createDirector, getModelCatalog, modelSettings } from '../src/lib/server/oev.ts';
 import { inactivityContext, outfitContext, participationContext, performanceContext, reflectionInput } from '../src/lib/theater/inference-context.ts';
+import { withInferenceLogContext } from '../src/lib/server/inference-log.ts';
 
 const originalFetch = globalThis.fetch;
 const originalRetries = process.env.NEWERA_MAX_RETRIES;
@@ -22,6 +23,14 @@ const actions = [
 ];
 const state = { scene: 'room', self: { id: 'actor' } };
 const json = (value, status = 200) => new Response(JSON.stringify(value), { status });
+function captureLog(logs, args) {
+	try {
+		const event = JSON.parse(args[0]);
+		if (typeof event.event === 'string') { logs.push([event.event, event]); return; }
+	} catch { /* Preserve non-structured legacy messages in the same capture. */ }
+	logs.push(args);
+}
+
 
 function provider(options = {}) {
 	const calls = [];
@@ -434,8 +443,8 @@ test('decision requests allow long inference and correlate transport logs withou
 	const logs = [];
 	const originalTimeout = AbortSignal.timeout;
 	t.mock.method(AbortSignal, 'timeout', (ms) => { deadlines.push(ms); return originalTimeout(ms); });
-	t.mock.method(console, 'info', (...args) => logs.push(args));
-	t.mock.method(console, 'warn', (...args) => logs.push(args));
+	t.mock.method(console, 'info', (...args) => captureLog(logs, args));
+	t.mock.method(console, 'warn', (...args) => captureLog(logs, args));
 	try {
 		delete process.env.NEWERA_DECISION_TIMEOUT_MS;
 		process.env.NEWERA_MODEL_CONFIG = join(tmpdir(), `newera-no-config-${crypto.randomUUID()}.json`);
@@ -444,7 +453,7 @@ test('decision requests allow long inference and correlate transport logs withou
 		await director.decide({ ...state, privateContext: 'do-not-log-this-private-memory' });
 		assert.deepEqual(deadlines, [120000, 120000], 'discovery and typed decisions must use the 120-second default');
 		const started = logs.find(([label, data]) => label === '[OEV] 요청 시작' && data.method === 'POST')[1];
-		const completed = logs.find(([label, data]) => label === '[OEV] 응답 완료' && data.requestId === started.requestId)[1];
+		const completed = logs.find(([label, data]) => label === '[OEV] HTTP 응답 수신' && data.requestId === started.requestId)[1];
 		assert.ok(started.endpoint.endsWith('/systemone'));
 		assert.ok(started.bytes > 0);
 		assert.equal(started.timeoutMs, 120000);
@@ -493,6 +502,112 @@ test('request timeout can retry while cancellation of the parent remains final',
 			assert.equal(attempts, 2);
 		} finally { if (previousTimeout === undefined) delete process.env.NEWERA_LLM_TIMEOUT_MS; else process.env.NEWERA_LLM_TIMEOUT_MS = previousTimeout; }
 	});
+});
+
+test('HTTP 200 token-limit responses explain each retry and final exhaustion without logging model text', async (t) => {
+	const logs = [];
+	for (const method of ['info', 'warn', 'error']) t.mock.method(console, method, (...args) => captureLog(logs, args));
+	await retrySettings(async () => {
+		provider(); const success = globalThis.fetch;
+		globalThis.fetch = async (url, init) => String(url).endsWith('/chat/completions') ? json({ choices: [{ finish_reason: 'length', message: { content: 'private-output-must-not-appear', reasoning_content: 'private-reasoning-must-not-appear' } }], usage: { prompt_tokens: 100, completion_tokens: 512, total_tokens: 612, completion_tokens_details: { reasoning_tokens: 480 } } }) : success(url, init);
+		const director = await createDirector(new AbortController().signal);
+		await assert.rejects(withInferenceLogContext({ worldId: 'world-limit', jobId: 'job-limit' }, () => director.perform({ ...state, scene: { id: 'room' }, time: { tick: 4 }, privateContext: 'private-context-must-not-appear' }, actions)), /3회 시도 후 실패.*finish_reason=length/);
+	});
+	const received = logs.filter(([label, data]) => label === '[OEV] HTTP 응답 수신' && data.schema === 'actor_performance').map(([, data]) => data);
+	assert.equal(received.length, 3); assert.deepEqual(received.map(data => data.attempt), [1, 2, 3]);
+	assert.equal(new Set(received.map(data => data.operationId)).size, 1);
+	for (const data of received) {
+		assert.equal(data.status, 200); assert.equal(data.finishReason, 'length'); assert.equal(data.completionTokens, 512); assert.equal(data.reasoningTokens, 480);
+		assert.ok(data.outputTokenLimit > 0); assert.ok(data.responseBytes > 0); assert.equal(data.worldId, 'world-limit'); assert.equal(data.jobId, 'job-limit'); assert.equal(data.actorId, 'actor');
+	}
+	const retries = logs.filter(([label]) => label === '[추론] 재시도 예약').map(([, data]) => data);
+	assert.equal(retries.length, 2);
+	for (const [index, data] of retries.entries()) {
+		assert.equal(data.code, 'output_token_limit'); assert.equal(data.stage, 'finish_reason'); assert.equal(data.requestId, received[index].requestId);
+		assert.equal(data.nextAttempt, index + 2); assert.ok(data.delayMs >= 0); assert.match(data.reason, /출력 토큰 한도/);
+	}
+	const exhausted = logs.findLast(([label]) => label === '[추론] 재시도 소진')[1];
+	assert.equal(exhausted.attempt, 3); assert.equal(exhausted.maxAttempts, 3); assert.equal(exhausted.requestId, received[2].requestId);
+	provider({ finishReason: 'eos_token' });
+	try { await assert.rejects((await createDirector(new AbortController().signal)).perform(state, actions), /finish_reason=eos_token/); }
+	finally { globalThis.fetch = originalFetch; }
+	assert.ok(logs.some(([label, data]) => label === '[추론] 출력 검증 실패' && data.finishReason === 'eos_token' && data.code === 'unexpected_finish_reason'));
+	for (const secret of ['private-output-must-not-appear', 'private-reasoning-must-not-appear', 'private-context-must-not-appear']) assert.ok(!JSON.stringify(logs).includes(secret));
+});
+
+test('JSON and action-schema failures log different stages and safe field shapes before a successful retry', async (t) => {
+	const logs = [];
+	for (const method of ['info', 'warn', 'error']) t.mock.method(console, method, (...args) => captureLog(logs, args));
+	await retrySettings(async () => {
+		provider(); const success = globalThis.fetch; let attempt = 0;
+		globalThis.fetch = async (url, init) => {
+			if (String(url).endsWith('/chat/completions')) {
+				attempt++;
+				const content = attempt === 1 ? 'not JSON: private-invalid-json' : attempt === 2 ? JSON.stringify({ actionId: 'speak:player', targetId: 'player', utterance: 'private-dialogue', memoUpdate: null, 'private-extra-field-name': 'private-extra-value' }) : undefined;
+				if (content !== undefined) return json({ choices: [{ finish_reason: 'stop', message: { content } }] });
+			}
+			return success(url, init);
+		};
+		const result = await (await createDirector(new AbortController().signal)).perform(state, actions);
+		assert.equal(result.actionId, 'speak:player');
+	});
+	const failures = logs.filter(([label]) => label === '[추론] 출력 검증 실패').map(([, data]) => data);
+	assert.deepEqual(failures.map(data => data.stage), ['json_parse', 'action_schema']);
+	assert.equal(failures[0].code, 'invalid_json'); assert.equal(failures[1].code, 'invalid_output');
+	assert.deepEqual(failures[1].missingFields, ['narrative']); assert.equal(failures[1].unexpectedFieldCount, 1); assert.equal(failures[1].fieldTypes.utterance, 'string');
+	assert.ok(logs.some(([label, data]) => label === '[추론] 출력 검증 통과' && data.stage === 'action_schema'));
+	assert.ok(!logs.some(([label]) => label === '[추론] 재시도 소진'));
+	const serialized = JSON.stringify(logs);
+	for (const secret of ['private-invalid-json', 'private-dialogue', 'private-extra-field-name', 'private-extra-value']) assert.ok(!serialized.includes(secret));
+});
+
+test('review rejection names the failed review and links its request to the original generation', async (t) => {
+	const logs = [];
+	for (const method of ['info', 'warn', 'error']) t.mock.method(console, method, (...args) => captureLog(logs, args));
+	await retrySettings(async () => {
+		provider({ reviewChoice: 'revise' });
+		await assert.rejects((await createDirector(new AbortController().signal)).perform(state, actions), /3회 시도 후 실패/);
+	});
+	const rejected = logs.filter(([label, data]) => label === '[추론] 출력 검증 실패' && data.stage === 'performance_review').map(([, data]) => data);
+	assert.equal(rejected.length, 3);
+	for (const failure of rejected) {
+		assert.equal(failure.code, 'review_rejected');
+		const review = logs.find(([label, data]) => label === '[OEV] 요청 시작' && data.question === 'performance_check' && data.parentRequestId === failure.requestId)[1];
+		assert.equal(review.parentOperationId, failure.operationId);
+		assert.ok(logs.some(([label, data]) => label === '[추론] 판단 선택' && data.requestId === review.requestId && data.choice === 'revise'));
+	}
+});
+
+test('concurrent worlds keep separate actor, job and operation IDs in generation and review logs', async (t) => {
+	const logs = [];
+	for (const method of ['info', 'warn', 'error']) t.mock.method(console, method, (...args) => captureLog(logs, args));
+	provider(); const success = globalThis.fetch;
+	globalThis.fetch = async (url, init) => { await new Promise(resolve => setTimeout(resolve, 2)); return success(url, init); };
+	try {
+		const director = await createDirector(new AbortController().signal);
+		await Promise.all(['one', 'two'].map(id => withInferenceLogContext({ worldId: `world-${id}`, jobId: `job-${id}` }, () => director.perform({ ...state, self: { id: `actor-${id}` }, scene: { id: `scene-${id}` } }, actions))));
+	} finally { globalThis.fetch = originalFetch; }
+	const requests = logs.filter(([label, data]) => label === '[OEV] 요청 시작' && data.method === 'POST').map(([, data]) => data);
+	assert.equal(requests.length, 6);
+	for (const request of requests) {
+		const id = request.worldId.slice('world-'.length); assert.equal(request.jobId, `job-${id}`); assert.equal(request.actorId, `actor-${id}`); assert.equal(request.sceneId, `scene-${id}`);
+	}
+	assert.notEqual(requests.find(data => data.worldId === 'world-one').operationId, requests.find(data => data.worldId === 'world-two').operationId);
+});
+
+test('cancellation during retry backoff is logged as cancellation without exhaustion or raw error text', async (t) => {
+	const logs = [];
+	for (const method of ['info', 'warn', 'error']) t.mock.method(console, method, (...args) => captureLog(logs, args));
+	await retrySettings(async () => {
+		provider(); const success = globalThis.fetch; const controller = new AbortController();
+		globalThis.fetch = async (url, init) => {
+			if (String(url).endsWith('/chat/completions')) { setTimeout(() => controller.abort(new Error('private-cancel-reason')), 5); return json({ error: 'private-upstream-error' }, 503); }
+			return success(url, init);
+		};
+		await assert.rejects((await createDirector(controller.signal)).perform(state, actions), /private-cancel-reason/);
+	});
+	assert.ok(logs.some(([label]) => label === '[추론] 취소')); assert.ok(!logs.some(([label]) => label === '[추론] 재시도 소진'));
+	assert.ok(!JSON.stringify(logs).includes('private-cancel-reason')); assert.ok(!JSON.stringify(logs).includes('private-upstream-error'));
 });
 
 test('generation selects detailed actions beyond the typed endpoint choice limit', async () => {

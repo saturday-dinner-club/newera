@@ -24,6 +24,44 @@ API 키는 저장 후 브라우저에 다시 보내지 않습니다. 입력란�
 
 OpenAI 호환 생성 요청에는 OEV 전용 `input_type`, `reasoning_effort`, `temperature`를 보내지 않습니다. JSON 객체 모드에서도 행동·대사 분리와 필드·실행 가능성 검증을 유지하며, 평문으로 자동 전환하지 않습니다. Provider가 선택한 구조화 출력 방식과 토큰 옵션을 지원해야 합니다. 이 기능은 Chat Completions 호환 API를 대상으로 하며 Responses 전용 API는 지원하지 않습니다.
 
+## 추론 로그
+
+앱 서버 stdout/stderr에 타임스탬프(`timestamp`, UTC ISO 8601)·수준(`level`)·이벤트(`event`)를 담은 JSON 한 줄씩 출력한다. 별도의 로그 수집기나 파일 저장은 추가하지 않는다.
+
+| 이벤트 | 의미 |
+| --- | --- |
+| `[추론] 시도 시작 / 완료` | 한 추론 시도의 시작과 검증·검수까지 마친 완료 |
+| `[OEV] 요청 시작` | 실제 HTTP 요청 시작. Provider·모델·`schema`/`question`·실제 `responseFormat`·출력 토큰 상한 포함 |
+| `[OEV] HTTP 응답 수신` | HTTP 응답 및 JSON 수신. 출력 계약을 통과했다는 뜻은 아님 |
+| `[추론] 출력 검증 통과 / 실패` | 응답 종료·JSON·스키마·의미 검수 단계 결과 |
+| `[추론] 재시도 예약` | 실패한 `requestId`, 단계·코드·사유, `delayMs`와 다음 시도 번호 |
+| `[추론] 재시도 소진 / 실패 / 취소` | 최종 실패 또는 호출자에 의한 취소. 취소는 info 수준이며 재시도하지 않음 |
+
+한 추론의 재시도들은 `operationId`가 같고 HTTP 시도별 `requestId`는 다르다. `attempt`는 1부터, `maxAttempts`는 최초 시도를 포함한 한도다. 중첩 검수는 `parentOperationId`, 검수 대상이 된 행동 생성은 `parentRequestId`로 연결한다. 장면 처리에는 `worldId/jobId/actorId/sceneId/tick`, 삽화 처리에는 `worldId/imageJobId`가 붙는다. 다른 세계관·인물의 동시 요청에도 문맥이 섞이지 않도록 AsyncLocalStorage를 사용한다.
+
+응답 요약은 `finishReason`, `contentChars`, `reasoningChars`, `refusal`, `promptTokens/completionTokens/totalTokens/reasoningTokens`다. 요청의 `bytes`와 응답의 `responseBytes`는 실제 바이트 크기다. 없는 사용량을 0으로 해석하지 않고 생략한다. 본문·추론·상태·프롬프트·인증 헤더·원문 오류 응답은 출력하지 않는다. 스키마 오류는 누락된 고정 필드 이름·예상 밖 필드 수·허용된 필드의 값 타입만 남긴다.
+
+| 단계·코드 | 확인할 내용 |
+| --- | --- |
+| `transport / http_429`, `http_500` 등 | Provider HTTP 오류. 기존 정책에서 재시도 가능한 상태만 재시도 |
+| `transport / timeout`, `connection`, `http_invalid_json` | 대기 시간·연결·HTTP 본문 JSON 문제 |
+| `finish_reason / output_token_limit` | `finishReason=length`. `outputTokenLimit`과 completion/reasoning 토큰 사용량 확인 |
+| `finish_reason / unexpected_finish_reason` | stop 이외 종료 원인. content filter·tool call 등 확인 |
+| `response_shape / missing_choices`, `model_refusal` | 응답 후보 누락 또는 모델 거절 |
+| `content / empty_content`, `invalid_content_type`, `content_too_long` | content가 없거나 문자열이 아니거나 길이 초과 |
+| `json_parse / invalid_json` | 모델이 반환한 content가 유효한 JSON이 아님 |
+| `action_schema`, `reflection_schema`, `typed_answer`, `image_prompt_schema`, `embedding_schema`의 `invalid_output` | 필드·타입·실행 후보·목격 근거 등 계약 불일치. `reason`, `missingFields`, `unexpectedFieldCount`, `fieldTypes` 확인 |
+| `identity_review / identity_contradiction` | 생성 결과가 고정 화자의 정체성과 모순됨 |
+| `performance_review / review_rejected` | 행동·대사 의미 검수에서 재작성 요청 |
+
+예를 들어 HTTP 200이라도 출력이 토큰 상한으로 잘리면 다음과 같이 기록한다(필드 일부만 표시한 예시).
+
+```json
+{"event":"[추론] 재시도 예약","operation":"행동·대사 생성","attempt":1,"maxAttempts":3,"requestId":"…","stage":"finish_reason","code":"output_token_limit","reason":"출력 토큰 한도를 확인해 주세요.","finishReason":"length","outputTokenLimit":512,"completionTokens":512,"delayMs":1000,"nextAttempt":2}
+```
+
+이 변경은 로그의 진단 정보만 늘린다. 출력 토큰 한도·재시도 횟수·대기 시간·출력 검증 계약은 자동으로 바꾸지 않는다. 이미지 판단·프롬프트 작성도 로그에 표시하지만 재시도 한도는 계속 0이다.
+
 ## 저장과 적용 시점
 
 등록 정보는 기본 `data/providers.json`에 저장합니다. `NEWERA_PROVIDER_CONFIG`로 경로를 바꿀 수 있습니다. 파일이 없으면 기존 `models.json` 또는 `NEWERA_OEV_BASE_URL`에서 기본 OEV 주소를 사용합니다. 파일을 저장한 뒤에는 등록된 기본 Provider의 주소를 사용하므로 이후 기본 주소 수정도 Provider 관리에서 합니다.

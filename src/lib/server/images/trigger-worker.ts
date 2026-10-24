@@ -1,4 +1,5 @@
 import { createImageDirector } from '$lib/server/oev';
+import { withInferenceRootContext } from '$lib/server/inference-log';
 import { imageGameTime } from '$lib/images/triggers';
 import { ImageGenerationError } from './common';
 import { generateWithImageConfig, ImageGenerationBusy, withImageGeneration } from './generate';
@@ -10,7 +11,7 @@ let timer: ReturnType<typeof setTimeout> | undefined;
 
 /** One process-wide image lane; illustration failures never fail the story turn. */
 export async function processImageCheck(job: ImageCheckJob): Promise<void> {
-	await withImageGeneration(async () => {
+	await withInferenceRootContext({ worldId: job.worldId, imageJobId: job.id, sceneId: job.input.scene.sceneId, tick: job.input.scene.tick }, () => withImageGeneration(async () => {
 		try {
 			if (!imageCheckValid(job)) { setImageCheckStatus(job.id, 'skipped'); return; }
 			setImageCheckStatus(job.id, 'checking');
@@ -30,7 +31,7 @@ export async function processImageCheck(job: ImageCheckJob): Promise<void> {
 		} catch (error) {
 			setImageCheckStatus(job.id, 'failed', undefined, error instanceof ImageGenerationError ? error.message : '삽화의 System One 판단·프롬프트 작성 또는 생성에 실패했습니다. 세션의 판단·생성 모델과 이미지 프리셋을 확인해 주세요. 자동 재시도하지 않습니다.');
 		}
-	});
+	}));
 }
 
 async function drain(): Promise<void> {

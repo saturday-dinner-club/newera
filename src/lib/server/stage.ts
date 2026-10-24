@@ -7,6 +7,7 @@ import { createMemoryRecall } from './memory-search';
 import { resolveProviderSnapshot } from './providers';
 import { checkJob, claimJob, enqueue, failJob, finishJob, getJobProviders, getWorld, heartbeatJob, nextJobInput, pinJobProviders, retryFailedJob, runnableJobs, saveJobProgress } from './stage-store';
 import { ensureImageWorker } from './images/trigger-worker';
+import { withInferenceRootContext } from './inference-log';
 
 const workerId = randomUUID();
 const scheduled = new Set<string>();
@@ -15,41 +16,43 @@ const leaseMs = 15000;
 async function processJob(id: string): Promise<void> {
 	const job = claimJob(id, workerId, new Date(Date.now() - leaseMs).toISOString());
 	if (!job) return;
-	const controller = new AbortController();
-	const checkpoint = () => { controller.signal.throwIfAborted(); checkJob(job, workerId); };
-	const timer = setInterval(() => {
-		try { checkpoint(); heartbeatJob(id, workerId); }
-		catch (error) { controller.abort(error); }
-	}, 3000);
-	try {
-		checkpoint();
-		// Empty scenes and object-only turns do not need a model connection.
-		let connected: Promise<Director> | undefined;
-		const settings = modelSettings();
-		const pinned = getJobProviders(job.id) ?? pinJobProviders(job, workerId, resolveProviderSnapshot(settings, job.models ?? settings));
-		const connection = () => connected ??= createDirector(controller.signal, job.models, checkpoint, pinned);
-		const recall = createMemoryRecall(controller.signal, checkpoint);
-		const director: Director = {
-			chooseAppearance: async (state, outfits) => (await connection()).chooseAppearance!(state, outfits),
-			reflect: async (state, context) => (await connection()).reflect(state, context),
-			decide: async (state) => (await connection()).decide(await recall(getWorld(job.worldId), state)),
-			perform: async (state, actions, writingStyle, previousAction) => {
-				const world = getWorld(job.worldId);
-				const observed = await recall(world, state);
-				checkpoint();
-				return (await connection()).perform({ ...observed, generationEvents: generationHistoryEvents(world, String((state.self as Record<string, unknown>).id)) }, actions, writingStyle, previousAction);
-			}
-		};
-		do {
-			await resolveTurn(getWorld(job.worldId), job.request, director, checkpoint, {
-				progress: job.progress,
-				nextInput: (consumedInputs) => nextJobInput(job, workerId, consumedInputs),
-				onProgress: (world, progress) => saveJobProgress(job, workerId, world, progress)
-			});
-		} while (!finishJob(job, workerId));
-	} catch (error) {
-		failJob(id, workerId, error instanceof Error ? error.message : '장면 진행에 실패했습니다.');
-	} finally { clearInterval(timer); ensureImageWorker(); }
+	await withInferenceRootContext({ jobId: job.id, worldId: job.worldId }, async () => {
+		const controller = new AbortController();
+		const checkpoint = () => { controller.signal.throwIfAborted(); checkJob(job, workerId); };
+		const timer = setInterval(() => {
+			try { checkpoint(); heartbeatJob(id, workerId); }
+			catch (error) { controller.abort(error); }
+		}, 3000);
+		try {
+			checkpoint();
+			// Empty scenes and object-only turns do not need a model connection.
+			let connected: Promise<Director> | undefined;
+			const settings = modelSettings();
+			const pinned = getJobProviders(job.id) ?? pinJobProviders(job, workerId, resolveProviderSnapshot(settings, job.models ?? settings));
+			const connection = () => connected ??= createDirector(controller.signal, job.models, checkpoint, pinned);
+			const recall = createMemoryRecall(controller.signal, checkpoint);
+			const director: Director = {
+				chooseAppearance: async (state, outfits) => (await connection()).chooseAppearance!(state, outfits),
+				reflect: async (state, context) => (await connection()).reflect(state, context),
+				decide: async (state) => (await connection()).decide(await recall(getWorld(job.worldId), state)),
+				perform: async (state, actions, writingStyle, previousAction) => {
+					const world = getWorld(job.worldId);
+					const observed = await recall(world, state);
+					checkpoint();
+					return (await connection()).perform({ ...observed, generationEvents: generationHistoryEvents(world, String((state.self as Record<string, unknown>).id)) }, actions, writingStyle, previousAction);
+				}
+			};
+			do {
+				await resolveTurn(getWorld(job.worldId), job.request, director, checkpoint, {
+					progress: job.progress,
+					nextInput: (consumedInputs) => nextJobInput(job, workerId, consumedInputs),
+					onProgress: (world, progress) => saveJobProgress(job, workerId, world, progress)
+				});
+			} while (!finishJob(job, workerId));
+		} catch (error) {
+			failJob(id, workerId, error instanceof Error ? error.message : '장면 진행에 실패했습니다.');
+		} finally { clearInterval(timer); ensureImageWorker(); }
+	});
 }
 function schedule(id: string): void {
 	if (scheduled.has(id)) return;

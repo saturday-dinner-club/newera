@@ -8,6 +8,7 @@ import { initialState } from '../src/lib/theater/runtime.ts';
 import { validateDefinition } from '../src/lib/theater/validation.ts';
 import { imageSceneSnapshot, imageGenerationPolicy } from '../src/lib/images/triggers.ts';
 import { buildBundle } from '../skills/newera-lore-authoring/scripts/lore-format.mjs';
+import { withInferenceLogContext } from '../src/lib/server/inference-log.ts';
 
 const directory = mkdtempSync(join(tmpdir(), 'newera-lore-images-'));
 process.env.NEWERA_DATA_DIR = directory;
@@ -87,8 +88,15 @@ test('System One skip performs neither prompt generation nor image API requests 
 	assert.deepEqual(calls[1].body.state.gameTime, { day: 2, hour: 0, minute: 5, tick: 2 }, 'the accepted game clock crosses midnight without using elapsed time');
 });
 
-test('affirmative System One decision precedes a generated natural prompt and the selected image preset', async () => {
-	const calls = mockPipeline(); const id = createWorld(); advance(id); const job = queue(id); await processImageCheck(job);
+test('affirmative System One decision precedes a generated natural prompt and the selected image preset', async (t) => {
+	const logs = [];
+	for (const method of ['info', 'warn', 'error']) t.mock.method(console, method, (line) => logs.push(JSON.parse(line)));
+	const calls = mockPipeline(); const id = createWorld(); advance(id); const job = queue(id);
+	await withInferenceLogContext({ worldId: 'other-world', jobId: 'other-job', actorId: 'other-actor', operationId: 'other-operation' }, () => processImageCheck(job));
+	for (const entry of logs) {
+		assert.equal(entry.worldId, id); assert.equal(entry.imageJobId, job.id);
+		assert.equal(entry.jobId, undefined); assert.equal(entry.actorId, undefined); assert.notEqual(entry.operationId, 'other-operation');
+	}
 	assert.deepEqual(calls.map(call => call.path), ['/v1/systemone', '/v1/chat/completions', '/v1/images/generations']);
 	assert.equal(calls[1].body.model, 'writer-model'); assert.equal(calls[1].body.response_format.json_schema.name, 'image_prompt');
 	assert.equal(calls[2].body.model, 'image-model'); assert.equal(calls[2].body.prompt, 'Watercolor.\n\nA quiet theater entrance after rain.');
