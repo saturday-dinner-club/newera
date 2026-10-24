@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { test } from 'node:test';
-import { createDirector, getModelCatalog, modelSettings } from '../src/lib/server/oev.ts';
+import { createDirector, createImageDirector, getModelCatalog, modelSettings } from '../src/lib/server/oev.ts';
 import { inactivityContext, outfitContext, participationContext, performanceContext, reflectionInput } from '../src/lib/theater/inference-context.ts';
 import { withInferenceLogContext } from '../src/lib/server/inference-log.ts';
 
@@ -44,6 +44,9 @@ function provider(options = {}) {
 		}
 		if (body.response_format?.json_schema?.name === 'character_reflection') {
 			return json({ choices: [{ finish_reason: options.reflectionFinishReason ?? 'stop', message: { content: JSON.stringify(options.reflectionOutput ?? { relationshipUpdates: [], memoUpdate: null }) } }] });
+		}
+		if (body.response_format?.json_schema?.name === 'image_prompt') {
+			return json({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({ prompt: 'A quiet theater.' }) } }] });
 		}
 		const output = { actionId: 'speak:player', targetId: 'player', narrative: null, utterance: '반가워요. 같이 준비할까요?', memoUpdate: null, ...options.output };
 		return json({ choices: [{ finish_reason: options.finishReason ?? 'stop', message: { content: options.content ?? JSON.stringify(output) } }] });
@@ -155,7 +158,7 @@ test('binary participation precedes structured action inference with Gemma4 26B'
 		assert.equal(calls[1].body.model, 'gemma4-26b');
 		assert.equal(calls[2].body.model, 'gemma4-26b');
 		assert.equal(calls[2].body.reasoning_effort, 'none');
-		assert.equal(calls[2].body.max_completion_tokens, 512);
+		assert.ok(!('max_completion_tokens' in calls[2].body) && !('max_tokens' in calls[2].body));
 		assert.equal(calls[2].body.response_format.type, 'json_schema');
 		assert.equal(calls[2].body.response_format.json_schema.strict, true);
 		assert.deepEqual(JSON.parse(calls[2].body.messages[1].content).availableActions, actions);
@@ -163,6 +166,34 @@ test('binary participation precedes structured action inference with Gemma4 26B'
 		assert.deepEqual(calls[2].body.response_format.json_schema.schema.properties.targetId.enum, ['player']);
 		assert.equal(calls[2].body.response_format.json_schema.schema.properties.actorId, undefined);
 	} finally { globalThis.fetch = originalFetch; }
+});
+
+test('legacy output token settings never cap action, reflection or image prompt requests', async () => {
+	const keys = ['NEWERA_MODEL_CONFIG', 'NEWERA_MAX_OUTPUT_TOKENS', 'NEWERA_REFLECTION_MAX_OUTPUT_TOKENS'];
+	const previous = keys.map(key => process.env[key]);
+	try {
+		process.env.NEWERA_MODEL_CONFIG = join(providerDirectory, 'legacy-models.json');
+		process.env.NEWERA_MAX_OUTPUT_TOKENS = '1';
+		process.env.NEWERA_REFLECTION_MAX_OUTPUT_TOKENS = '1';
+		for (const legacy of [{}, { maxOutputTokens: 2, reflectionMaxOutputTokens: 2 }, { maxOutputTokens: -1, reflectionMaxOutputTokens: -1 }]) {
+			writeFileSync(process.env.NEWERA_MODEL_CONFIG, JSON.stringify(legacy));
+			const settings = modelSettings();
+			assert.ok(!('maxOutputTokens' in settings) && !('reflectionMaxOutputTokens' in settings));
+			const calls = provider();
+			const signal = new AbortController().signal;
+			const director = await createDirector(signal);
+			await director.perform(state, actions);
+			await director.reflect(state, { newEvents: [], evidenceEvents: [], targets: [] });
+			assert.equal(await createImageDirector({ decisionModel: 'gemma4-26b', textModel: 'gemma4-26b' }, signal).writePrompt({}, 'natural'), 'A quiet theater.');
+			const generated = calls.filter(call => call.url.endsWith('/chat/completions'));
+			assert.equal(generated.length, 3);
+			for (const { body } of generated) assert.ok(!('max_completion_tokens' in body) && !('max_tokens' in body));
+		}
+	} finally {
+		globalThis.fetch = originalFetch;
+		keys.forEach((key, index) => { if (previous[index] === undefined) delete process.env[key]; else process.env[key] = previous[index]; });
+		modelSettings();
+	}
 });
 
 test('writing style reaches only performance generation and keeps the strict action schema', async () => {
@@ -199,7 +230,7 @@ test('reflection uses the selected generation model and strict schema before bin
 		assert.equal((await director.decide(state)).act, false);
 		const body = calls[1].body;
 		assert.equal(body.model, 'gemma4-26b');
-		assert.equal(body.max_completion_tokens, 1024);
+		assert.ok(!('max_completion_tokens' in body) && !('max_tokens' in body));
 		assert.equal(body.response_format.json_schema.name, 'character_reflection');
 		assert.equal(body.response_format.json_schema.strict, true);
 		assert.deepEqual(JSON.parse(body.messages[1].content).newEvents, [event]);
@@ -518,7 +549,7 @@ test('HTTP 200 token-limit responses explain each retry and final exhaustion wit
 	assert.equal(new Set(received.map(data => data.operationId)).size, 1);
 	for (const data of received) {
 		assert.equal(data.status, 200); assert.equal(data.finishReason, 'length'); assert.equal(data.completionTokens, 512); assert.equal(data.reasoningTokens, 480);
-		assert.ok(data.outputTokenLimit > 0); assert.ok(data.responseBytes > 0); assert.equal(data.worldId, 'world-limit'); assert.equal(data.jobId, 'job-limit'); assert.equal(data.actorId, 'actor');
+		assert.equal(data.outputTokenLimit, undefined); assert.ok(data.responseBytes > 0); assert.equal(data.worldId, 'world-limit'); assert.equal(data.jobId, 'job-limit'); assert.equal(data.actorId, 'actor');
 	}
 	const retries = logs.filter(([label]) => label === '[추론] 재시도 예약').map(([, data]) => data);
 	assert.equal(retries.length, 2);
@@ -661,17 +692,17 @@ test('model config reload validates a complete candidate and retains the last va
 	const originalPath = process.env.NEWERA_MODEL_CONFIG;
 	try {
 		process.env.NEWERA_MODEL_CONFIG = join(scratch, 'models.json');
-		writeFileSync(process.env.NEWERA_MODEL_CONFIG, JSON.stringify({ baseUrl: 'http://example.test/v1', textModel: 'one', maxOutputTokens: 300 }));
+		writeFileSync(process.env.NEWERA_MODEL_CONFIG, JSON.stringify({ baseUrl: 'http://example.test/v1', textModel: 'one' }));
 		assert.equal(modelSettings().textModel, 'one');
-		writeFileSync(process.env.NEWERA_MODEL_CONFIG, JSON.stringify({ baseUrl: 'http://example.test/v1', textModel: 'two', maxOutputTokens: 600 }));
-		assert.equal(modelSettings().maxOutputTokens, 600);
+		writeFileSync(process.env.NEWERA_MODEL_CONFIG, JSON.stringify({ baseUrl: 'http://example.test/v1', textModel: 'two' }));
+		assert.equal(modelSettings().textModel, 'two');
 		writeFileSync(process.env.NEWERA_MODEL_CONFIG, JSON.stringify({ textModel: 'two', maxRetries: 1, retryBaseMs: 5, retryMaxMs: 10 }));
 		assert.equal(modelSettings().maxRetries, 1);
 		writeFileSync(process.env.NEWERA_MODEL_CONFIG, JSON.stringify({ textModel: 'broken', maxRetries: 6 }));
 		assert.equal(modelSettings().maxRetries, 1);
 		writeFileSync(process.env.NEWERA_MODEL_CONFIG, JSON.stringify({ textModel: 'broken', retryBaseMs: 20, retryMaxMs: 10 }));
 		assert.equal(modelSettings().retryBaseMs, 5);
-		writeFileSync(process.env.NEWERA_MODEL_CONFIG, JSON.stringify({ textModel: 'broken', maxOutputTokens: -1 }));
+		writeFileSync(process.env.NEWERA_MODEL_CONFIG, JSON.stringify({ textModel: 'broken', timeoutMs: -1 }));
 		assert.equal(modelSettings().textModel, 'two');
 	} finally {
 		if (originalPath === undefined) delete process.env.NEWERA_MODEL_CONFIG; else process.env.NEWERA_MODEL_CONFIG = originalPath;

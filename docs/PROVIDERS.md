@@ -18,11 +18,10 @@ API 키는 저장 후 브라우저에 다시 보내지 않습니다. 입력란�
 
 | 옵션 | 동작 |
 | --- | --- |
-| 출력 토큰 옵션 | `max_completion_tokens` 또는 `max_tokens`를 선택합니다. |
 | JSON Schema | 생성 요청에 기존 `response_format.json_schema` 계약을 전달합니다. |
 | JSON 객체 | `response_format: {"type":"json_object"}`와 스키마 지침을 전달하고, 앱이 동일한 출력 계약을 검증합니다. |
 
-OpenAI 호환 생성 요청에는 OEV 전용 `input_type`, `reasoning_effort`, `temperature`를 보내지 않습니다. JSON 객체 모드에서도 행동·대사 분리와 필드·실행 가능성 검증을 유지하며, 평문으로 자동 전환하지 않습니다. Provider가 선택한 구조화 출력 방식과 토큰 옵션을 지원해야 합니다. 이 기능은 Chat Completions 호환 API를 대상으로 하며 Responses 전용 API는 지원하지 않습니다.
+OpenAI 호환 생성 요청에는 OEV 전용 `input_type`, `reasoning_effort`, `temperature`를 보내지 않습니다. 모든 생성 Provider에 `max_completion_tokens`와 `max_tokens`를 생략하며 출력 길이는 Provider의 기본 설정과 모델 문맥 한도를 따릅니다. 기존 `outputTokenParameter`는 저장 데이터 호환을 위해 읽고 보존하지만 요청에는 적용하지 않습니다. JSON 객체 모드에서도 행동·대사 분리와 필드·실행 가능성 검증을 유지하며, 평문으로 자동 전환하지 않습니다. Provider가 선택한 구조화 출력 방식을 지원해야 합니다. 이 기능은 Chat Completions 호환 API를 대상으로 하며 Responses 전용 API는 지원하지 않습니다.
 
 ## 추론 로그
 
@@ -31,7 +30,7 @@ OpenAI 호환 생성 요청에는 OEV 전용 `input_type`, `reasoning_effort`, `
 | 이벤트 | 의미 |
 | --- | --- |
 | `[추론] 시도 시작 / 완료` | 한 추론 시도의 시작과 검증·검수까지 마친 완료 |
-| `[OEV] 요청 시작` | 실제 HTTP 요청 시작. Provider·모델·`schema`/`question`·실제 `responseFormat`·출력 토큰 상한 포함 |
+| `[OEV] 요청 시작` | 실제 HTTP 요청 시작. Provider·모델·`schema`/`question`·실제 `responseFormat` 포함 |
 | `[OEV] HTTP 응답 수신` | HTTP 응답 및 JSON 수신. 출력 계약을 통과했다는 뜻은 아님 |
 | `[추론] 출력 검증 통과 / 실패` | 응답 종료·JSON·스키마·의미 검수 단계 결과 |
 | `[추론] 재시도 예약` | 실패한 `requestId`, 단계·코드·사유, `delayMs`와 다음 시도 번호 |
@@ -45,7 +44,7 @@ OpenAI 호환 생성 요청에는 OEV 전용 `input_type`, `reasoning_effort`, `
 | --- | --- |
 | `transport / http_429`, `http_500` 등 | Provider HTTP 오류. 기존 정책에서 재시도 가능한 상태만 재시도 |
 | `transport / timeout`, `connection`, `http_invalid_json` | 대기 시간·연결·HTTP 본문 JSON 문제 |
-| `finish_reason / output_token_limit` | `finishReason=length`. `outputTokenLimit`과 completion/reasoning 토큰 사용량 확인 |
+| `finish_reason / output_token_limit` | `finishReason=length`. Provider의 출력·문맥 한도와 completion/reasoning 토큰 사용량 확인 |
 | `finish_reason / unexpected_finish_reason` | stop 이외 종료 원인. content filter·tool call 등 확인 |
 | `response_shape / missing_choices`, `model_refusal` | 응답 후보 누락 또는 모델 거절 |
 | `content / empty_content`, `invalid_content_type`, `content_too_long` | content가 없거나 문자열이 아니거나 길이 초과 |
@@ -54,13 +53,13 @@ OpenAI 호환 생성 요청에는 OEV 전용 `input_type`, `reasoning_effort`, `
 | `identity_review / identity_contradiction` | 생성 결과가 고정 화자의 정체성과 모순됨 |
 | `performance_review / review_rejected` | 행동·대사 의미 검수에서 재작성 요청 |
 
-예를 들어 HTTP 200이라도 출력이 토큰 상한으로 잘리면 다음과 같이 기록한다(필드 일부만 표시한 예시).
+예를 들어 HTTP 200이라도 Provider의 출력·문맥 한도로 잘리면 다음과 같이 기록한다(필드 일부만 표시한 예시).
 
 ```json
-{"event":"[추론] 재시도 예약","operation":"행동·대사 생성","attempt":1,"maxAttempts":3,"requestId":"…","stage":"finish_reason","code":"output_token_limit","reason":"출력 토큰 한도를 확인해 주세요.","finishReason":"length","outputTokenLimit":512,"completionTokens":512,"delayMs":1000,"nextAttempt":2}
+{"event":"[추론] 재시도 예약","operation":"행동·대사 생성","attempt":1,"maxAttempts":3,"requestId":"…","stage":"finish_reason","code":"output_token_limit","reason":"출력 토큰 한도를 확인해 주세요.","finishReason":"length","completionTokens":512,"delayMs":1000,"nextAttempt":2}
 ```
 
-이 변경은 로그의 진단 정보만 늘린다. 출력 토큰 한도·재시도 횟수·대기 시간·출력 검증 계약은 자동으로 바꾸지 않는다. 이미지 판단·프롬프트 작성도 로그에 표시하지만 재시도 한도는 계속 0이다.
+앱은 출력 토큰 상한을 지정하지 않으며 Provider가 중단한 출력의 검증·실패 사유는 계속 기록한다. 재시도 횟수·대기 시간·출력 검증 계약은 유지한다. 이미지 판단·프롬프트 작성도 로그에 표시하지만 재시도 한도는 계속 0이다.
 
 ## 저장과 적용 시점
 
@@ -97,7 +96,6 @@ GUI가 안정적인 ID를 생성합니다. 선택 값은 `Provider ID::별칭 ID
       "kind": "openai-compatible",
       "baseUrl": "http://localhost:8000/v1",
       "apiKeyEnv": "STORY_API_KEY",
-      "outputTokenParameter": "max_tokens",
       "structuredOutput": "json_schema",
       "models": [
         { "id": "story", "label": "상세 서술", "modelId": "my-story-model", "task": "generation" }
@@ -107,7 +105,7 @@ GUI가 안정적인 ID를 생성합니다. 선택 값은 `Provider ID::별칭 ID
 }
 ```
 
-Provider는 최대 32개, 각 Provider의 별칭은 최대 100개입니다. 별칭 ID는 Provider 안에서 고유해야 합니다. 기본 Provider에는 `id: "default"`, `kind: "oev"`가 필요합니다. 생략한 토큰 옵션과 구조화 출력 기본값은 각각 `max_completion_tokens`, `json_schema`입니다.
+Provider는 최대 32개, 각 Provider의 별칭은 최대 100개입니다. 별칭 ID는 Provider 안에서 고유해야 합니다. 기본 Provider에는 `id: "default"`, `kind: "oev"`가 필요합니다. 생략한 구조화 출력 기본값은 `json_schema`입니다.
 
 임베딩 Provider는 `task: "embedding"` 별칭을 등록하고 `models.json`의 `embeddingModel` 또는 `NEWERA_EMBEDDING_MODEL`에 `Provider ID::별칭 ID`를 지정합니다. 기본 `embeddinggemma2`는 기존 기본 OEV를 사용합니다. 임베딩 모델과 차원은 별도 설정을 유지하며, 실제 API 주소·유형·모델이 달라지면 다른 LanceDB 테이블을 사용합니다. 각 검색은 테이블 구분과 실제 임베딩 요청에 같은 Provider 스냅샷을 사용하며 다음 검색부터 별칭 변경을 반영합니다. 모델 선택 GUI는 판단·생성용이며 임베딩 선택은 파일·환경 변수로 설정합니다.
 

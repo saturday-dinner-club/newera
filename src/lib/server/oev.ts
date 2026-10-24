@@ -19,8 +19,6 @@ export interface Settings extends RetryPolicy {
 	textModel: string;
 	timeoutMs: number;
 	decisionTimeoutMs: number;
-	maxOutputTokens: number;
-	reflectionMaxOutputTokens: number;
 	generationHistoryTokens: number;
 	embeddingModel: string;
 	embeddingDimensions: number;
@@ -57,8 +55,6 @@ export function modelSettings(): Settings {
 			textModel: text(file.textModel ?? process.env.NEWERA_TEXT_MODEL ?? '', '생성 모델', 200, true) || decisionModel,
 			timeoutMs: integerSetting(file.timeoutMs ?? process.env.NEWERA_LLM_TIMEOUT_MS, 120000, '생성 대기 시간', 1800000),
 			decisionTimeoutMs: integerSetting(file.decisionTimeoutMs ?? process.env.NEWERA_DECISION_TIMEOUT_MS, 120000, '판단 대기 시간', 1800000),
-			maxOutputTokens: integerSetting(file.maxOutputTokens ?? process.env.NEWERA_MAX_OUTPUT_TOKENS, 512, '행동 생성 토큰 한도', 32768),
-			reflectionMaxOutputTokens: integerSetting(file.reflectionMaxOutputTokens ?? process.env.NEWERA_REFLECTION_MAX_OUTPUT_TOKENS, 1024, '관찰 해석 토큰 한도', 32768),
 			generationHistoryTokens: integerSetting(file.generationHistoryTokens ?? process.env.NEWERA_GENERATION_HISTORY_TOKENS, 32768, '생성 히스토리 토큰 한도', 131072, 256),
 			embeddingModel: text(file.embeddingModel ?? process.env.NEWERA_EMBEDDING_MODEL ?? 'embeddinggemma2', '임베딩 모델', 200),
 			embeddingDimensions: integerSetting(file.embeddingDimensions ?? process.env.NEWERA_EMBEDDING_DIMENSIONS, 768, '임베딩 차원', 4096),
@@ -89,7 +85,6 @@ function providerBody(route: ProviderRoute, path: string, input: unknown): unkno
 		if (path === '/chat/completions') {
 			delete body.reasoning_effort;
 			delete body.temperature;
-			if (route.outputTokenParameter === 'max_tokens') { body.max_tokens = body.max_completion_tokens; delete body.max_completion_tokens; }
 			if (route.structuredOutput === 'json_object') {
 				const schema = record(record(body.response_format, '구조화된 출력').json_schema, 'JSON 스키마').schema;
 				body.response_format = { type: 'json_object' };
@@ -289,7 +284,7 @@ export function createImageDirector(models: ModelSelection, signal: AbortSignal)
 		async writePrompt(input: Record<string, unknown>, format: 'tags' | 'natural'): Promise<string> {
 			return withRetries('이미지 프롬프트 작성', { ...settings, maxRetries: 0 }, signal, async () => {
 				const response = await request(settings, '/chat/completions', signal, {
-					model: routes.text.model, temperature: 0.3, stream: false, reasoning_effort: 'none', max_completion_tokens: Math.max(1024, settings.maxOutputTokens),
+					model: routes.text.model, temperature: 0.3, stream: false, reasoning_effort: 'none',
 					response_format: { type: 'json_schema', json_schema: { name: 'image_prompt', strict: true, schema: { type: 'object', additionalProperties: false, required: ['prompt'], properties: { prompt: { type: 'string' } } } } },
 					messages: [
 						{ role: 'system', content: `당신은 확정된 장면을 이미지 모델에 전달할 프롬프트 작성자다. 현재 공개 장소·등장 대상·겉모습·확정된 행동을 바탕으로 한 장면을 구성한다. 다른 인물의 행동·속마음이나 새로운 사건을 만들어내지 않는다. 로어북의 promptInstructions를 따른다. 출력 형식은 ${format === 'tags' ? '쉼표로 구분한 이미지 생성 태그' : '완성된 자연어 이미지 묘사'}다. 기본 언어는 영어이며 로어북에 언어 지침이 있으면 우선한다. API 루트·모델 이름·JSON 상태·조건 판정 설명을 그림 프롬프트에 복사하지 않는다. 이미지 프리셋의 stylePrompt는 실행기가 별도로 붙이므로 그대로 반복하지 않는다. prompt 필드만 있는 JSON을 출력한다.` },
@@ -379,7 +374,7 @@ export async function createDirector(signal: AbortSignal, models?: ModelSelectio
 				checkpoint();
 				try {
 					const response = await request(settings, '/chat/completions', signal, {
-						model: textModel, temperature: 0.3, stream: false, reasoning_effort: 'none', max_completion_tokens: settings.reflectionMaxOutputTokens,
+						model: textModel, temperature: 0.3, stream: false, reasoning_effort: 'none',
 						response_format: { type: 'json_schema', json_schema: { name: 'character_reflection', strict: true, schema: reflectionSchema(context) } },
 						messages: [
 							{ role: 'system', content: `당신은 장면 안의 self 인물이다. 이번 해석 대상은 newEvents뿐이다. pastEvents는 이미 처리한 과거 맥락이며 다시 평가할 새 사건이 아니다. newEvents 때문에 실제로 달라진 자기 관계와 개인 메모만 JSON으로 제안한다. 새 사건이 의미 있는 변화를 주지 않으면 relationshipUpdates는 빈 배열, memoUpdate는 null로 둔다. 행동·대사·외부 사건을 생성하지 않는다. self.relationships는 당신이 상대를 어떻게 보는지이며 상대의 속마음이 아니다. trust는 말·약속에 대한 신뢰, affinity는 호감, closeness는 가까움·편안함, respect는 능력·판단·가치에 대한 존중, wariness는 위협을 느끼거나 조심하는 정도다. 각 항목은 독립적인 0~100 정수이며 null은 아직 판단하지 못함이다. 모르는 상대를 자동으로 50점이나 극단값으로 정하지 않는다. 숫자는 성격·목표와 함께 판단할 자료이며 복종·동행·동의를 강제하지 않는다. 단순 인사나 같은 이야기의 반복만으로 관계를 계속 높이지 말고 의미 있는 근거가 있을 때만 변경한다. relationshipUpdates에는 변경할 상대만 넣고 없으면 빈 배열이다. targetId는 targets에서 고르며 changes는 변경할 field와 변경 후 절대값 value만 담는다. impression은 상대에 대한 짧은 주관적 인식이며 변경하지 않으면 null이다. evidenceEventIds에는 변경 계기가 된 newEvents의 eventId를 반드시 하나 이상 넣는다. pastEvents의 ID는 보조 근거로만 추가할 수 있다. 과거 사건만으로 관계를 다시 바꾸지 않는다. actorId나 자신 이외 주체의 관계는 출력하지 않는다. memoUpdate는 summary/currentIntention/feelings/openThreads 전체 또는 유지할 때 null이다. 화남·질투·서운함·고마움 같은 현재 감정은 메모에 상대와 원인을 적고 장기 관계와 구분한다. 다른 인물의 숨은 의도·지식·감정을 사실로 확정하지 않는다. 관계 초기 설정과 과거 사건을 새 사실처럼 중복 평가하지 않는다. ${observationInstructions}` },
@@ -414,7 +409,7 @@ export async function createDirector(signal: AbortSignal, models?: ModelSelectio
 				checkpoint();
 				try {
 					const response = await request(settings, '/chat/completions', signal, {
-						model: textModel, temperature: 0.8, stream: false, reasoning_effort: 'none', max_completion_tokens: settings.maxOutputTokens,
+						model: textModel, temperature: 0.8, stream: false, reasoning_effort: 'none',
 						response_format: { type: 'json_schema', json_schema: { name: 'actor_performance', strict: true, schema } },
 						messages: [
 							{ role: 'system', content: `${speakerInstructions} ${historyInstructions} 당신은 장면 안의 self 인물 한 명이다. 관찰·성격·목표·자신의 상대별 관계·개인 메모에 따라 availableActions에서 구체적인 행동 하나를 추론하고 JSON으로만 출력한다. actionId와 targetId는 실행할 후보의 ID와 대상 ID를 그대로 쓴다. 행동 주체는 실행기가 self.id로 붙이므로 출력하지 않는다. narrative는 자신이 하는 몸짓·행동만 주어를 생략한 짧은 한국어 동사구로 쓰며 이동·상호작용에는 필수다. utterance는 speak 행동에서만 필수이며 다른 행동에서는 null이다. 대사는 한국어 1~3문장의 실제 발언만 쓰고 내레이션·화자 이름·몸짓을 섞지 않는다. 다른 인물이나 플레이어의 말·선택·반응·행동 결과를 대신 확정하지 않는다. 숨겨진 정보나 관찰하지 않은 사건을 알지 못한다. 상태 효과는 실행기가 처리한다. memoUpdate는 자신의 짧은 비공개 메모 전체(summary, currentIntention, feelings, openThreads) 또는 변경하지 않을 때 null이다. 메모에는 관찰과 자신의 해석을 구분하고 타인의 속마음을 사실로 쓰지 않는다. actionId, targetId, narrative, utterance, memoUpdate 외에는 출력하지 않는다. ${observationInstructions}${styleInstructions}` },

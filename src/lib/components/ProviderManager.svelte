@@ -115,7 +115,6 @@
 		<details><summary>API 세부 옵션</summary>
 			<label>API 키 환경 변수<input bind:value={apiKeyEnv} placeholder="예: MY_PROVIDER_API_KEY" disabled={busy} /></label>
 			<p class="field-hint">서버 환경 변수의 키를 쓸 때 지정합니다. 직접 입력한 키보다 우선합니다.</p>
-			<label>출력 토큰 옵션<select bind:value={outputTokenParameter} disabled={busy}><option value="max_completion_tokens">max_completion_tokens</option><option value="max_tokens">max_tokens</option></select></label>
 			<label>구조화된 출력<select bind:value={structuredOutput} disabled={busy}><option value="json_schema">JSON Schema</option><option value="json_object">JSON 객체 · 앱에서 스키마 검증</option></select></label>
 		</details>
 		<div class="model-buttons"><button disabled={busy || !registry}>{busy ? '처리 중…' : 'Provider 저장'}</button><button type="button" onclick={reload} disabled={busy}>등록 목록 새로고침</button>{#if selected && selected !== 'default'}<button type="button" class="danger-button" onclick={remove} disabled={busy}>Provider 삭제</button>{/if}</div>

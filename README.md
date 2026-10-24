@@ -71,8 +71,6 @@ npm start
 | `NEWERA_TEXT_MODEL` | `gemma4-26b` (미지정 시 판단 모델과 동일) | `/chat/completions` 관찰·관계 해석과 상세 행동·대사·메모 생성 모델 |
 | `NEWERA_DECISION_TIMEOUT_MS` | `120000` | 모델 검색·판단 요청별 대기 시간 |
 | `NEWERA_LLM_TIMEOUT_MS` | `120000` | 구조화된 생성 요청별 대기 시간 |
-| `NEWERA_MAX_OUTPUT_TOKENS` | `512` | 상세 행동 출력 토큰 한도 |
-| `NEWERA_REFLECTION_MAX_OUTPUT_TOKENS` | `1024` | 관찰·관계 해석 출력 토큰 한도, 1~32768 |
 | `NEWERA_GENERATION_HISTORY_TOKENS` | `32768` | 행동·대사 생성 전용 히스토리 추정 토큰 예산, 256~131072 |
 | `NEWERA_MAX_RETRIES` | `2` | 실패한 호출의 추가 재시도 횟수, 0~5 (0이면 비활성화) |
 | `NEWERA_RETRY_BASE_MS` | `1000` | 지수 백오프의 기본 대기 시간 |
@@ -91,6 +89,8 @@ npm start
 
 `models.json`은 다음 진행을 시작할 때 다시 읽습니다. 파일이 환경 변수보다 우선하며, 수락한 진행은 설정 스냅샷을 유지합니다. 잘못된 파일은 경고를 남기고 마지막 유효 설정을 유지합니다. 최초 설정이 잘못되었으면 생성을 실패시킵니다.
 
+행동·대사, 관찰·관계 해석, 삽화 프롬프트 생성에는 앱이 `max_completion_tokens`나 `max_tokens`를 보내지 않습니다. 출력 길이는 Provider의 기본 설정과 모델 문맥 한도를 따릅니다. 기존 `NEWERA_MAX_OUTPUT_TOKENS`·`NEWERA_REFLECTION_MAX_OUTPUT_TOKENS` 환경 변수와 `models.json`의 `maxOutputTokens`·`reflectionMaxOutputTokens`는 무시합니다. `NEWERA_GENERATION_HISTORY_TOKENS`는 입력 히스토리 예산으로 계속 적용합니다.
+
 ```json
 {
   "baseUrl": "http://macstudio:12821/v1",
@@ -98,8 +98,6 @@ npm start
   "textModel": "gemma4-26b",
   "decisionTimeoutMs": 120000,
   "timeoutMs": 120000,
-  "maxOutputTokens": 512,
-  "reflectionMaxOutputTokens": 1024,
   "maxRetries": 2,
   "retryBaseMs": 1000,
   "retryMaxMs": 8000
@@ -108,7 +106,7 @@ npm start
 
 환경 변수와 `.env`, SQLite 위치를 변경하면 서버를 재시작해야 합니다. 환경 변수는 프로세스 시작 입력이고 SQLite 연결은 한 데이터 디렉터리에 묶여 있습니다.
 
-앱 서버 콘솔에는 타임스탬프가 있는 JSON 로그를 한 줄씩 출력합니다. `[OEV] 요청 시작 / HTTP 응답 수신 / 요청 실패`에는 요청 ID, 실제 Provider·모델, 작업 종류·시도 횟수, 전송·응답 크기, 시간 제한과 소요 시간을 남깁니다. `HTTP 응답 수신`은 전송 완료이며 모델 출력 검증 성공을 뜻하지 않습니다. 응답에는 `finishReason`, 출력 토큰 한도, 실제 토큰 사용량과 본문·추론 길이도 기록합니다. Provider가 제공하지 않은 사용량은 생략합니다.
+앱 서버 콘솔에는 타임스탬프가 있는 JSON 로그를 한 줄씩 출력합니다. `[OEV] 요청 시작 / HTTP 응답 수신 / 요청 실패`에는 요청 ID, 실제 Provider·모델, 작업 종류·시도 횟수, 전송·응답 크기, 시간 제한과 소요 시간을 남깁니다. `HTTP 응답 수신`은 전송 완료이며 모델 출력 검증 성공을 뜻하지 않습니다. 응답에는 `finishReason`, 실제 토큰 사용량과 본문·추론 길이도 기록합니다. Provider가 제공하지 않은 사용량은 생략합니다.
 
 출력 오류는 `[추론] 출력 검증 실패`, 재시도는 `[추론] 재시도 예약`, 최종 실패는 `[추론] 재시도 소진` 또는 `[추론] 실패`로 구분합니다. `stage/code/reason`으로 잘림·JSON 파싱·행동 필드·검수 거절을 확인하고, `operationId`로 한 작업의 여러 시도를, `requestId`로 해당 HTTP 응답을 연결합니다. 장면 작업은 `worldId/jobId/actorId`, 검수 요청은 `parentRequestId`로 원래 생성 요청까지 연결됩니다. 대화·개인 메모·원본 모델 출력·추론 내용·API 키는 기록하지 않습니다. [로그 읽는 법과 오류 코드](docs/PROVIDERS.md#추론-로그)를 참고하세요.
 

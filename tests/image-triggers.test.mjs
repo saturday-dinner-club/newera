@@ -99,6 +99,7 @@ test('affirmative System One decision precedes a generated natural prompt and th
 	}
 	assert.deepEqual(calls.map(call => call.path), ['/v1/systemone', '/v1/chat/completions', '/v1/images/generations']);
 	assert.equal(calls[1].body.model, 'writer-model'); assert.equal(calls[1].body.response_format.json_schema.name, 'image_prompt');
+	assert.ok(!('max_completion_tokens' in calls[1].body) && !('max_tokens' in calls[1].body));
 	assert.equal(calls[2].body.model, 'image-model'); assert.equal(calls[2].body.prompt, 'Watercolor.\n\nA quiet theater entrance after rain.');
 	assert.ok(!calls[2].body.prompt.includes('recentEvents'), 'raw JSON scene is never sent as an image prompt');
 	const row = stage.store().prepare('SELECT bytes,media_type,input_json FROM theater_illustrations WHERE id=?').get(job.id);

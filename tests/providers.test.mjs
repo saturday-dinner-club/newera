@@ -90,7 +90,7 @@ test('generation and every typed review use separate configured providers, auth 
 	const generated = calls.filter(c => c.url.endsWith('/chat/completions'));
 	assert.equal(generated.length, 2);
 	assert.ok(generated.every(c => c.url.startsWith('http://two.test/') && c.headers.authorization === 'Bearer key-two' && c.body.model === 'same-model'));
-	assert.ok(generated.every(c => c.body.response_format.type === 'json_schema' && c.body.max_tokens > 0 && !('max_completion_tokens' in c.body) && !('reasoning_effort' in c.body) && !('temperature' in c.body)));
+	assert.ok(generated.every(c => c.body.response_format.type === 'json_schema' && !('max_tokens' in c.body) && !('max_completion_tokens' in c.body) && !('reasoning_effort' in c.body) && !('temperature' in c.body)));
 });
 
 test('provider and alias edits affect new directors while pinned routes survive edits and deletion', async (t) => {
@@ -117,7 +117,7 @@ test('JSON object providers still receive schema guidance and host output valida
 	const generated = calls.find(c => c.url.endsWith('/chat/completions'));
 	assert.equal(generated.body.response_format.type, 'json_object');
 	assert.match(generated.body.messages.at(-1).content, /actionId/);
-	assert.equal(generated.body.max_completion_tokens, 512);
+	assert.ok(!('max_completion_tokens' in generated.body) && !('max_tokens' in generated.body));
 });
 
 test('embedding aliases use the embedding provider and validate its real model ID', async (t) => {

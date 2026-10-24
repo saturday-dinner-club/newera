@@ -103,4 +103,4 @@ flowchart TD
 
 편집 화면의 **배치·관계 → 인물**에서 편집 시점(지금의 모습/이야기 시작 시점)을 고르고, **상대별 관계**에서 상대 선택·슬라이더·숫자·미평가 옵션·인식 문장으로 수정한다. 현재 관계 편집은 기존 근거·커서를 보존한다. 초기 관계 편집은 현재 진행을 덮어쓰지 않는다. [작업실 사용 안내](EDITOR_GUIDE.md)를 참고한다.
 
-해석 출력 토큰 한도는 `NEWERA_REFLECTION_MAX_OUTPUT_TOKENS` 또는 `models.json`의 `reflectionMaxOutputTokens`로 설정한다. 기본값은 1024, 범위는 1~32768이다. 기존 `maxOutputTokens` 기본값 512는 상세 행동 생성에 적용한다. 두 설정 모두 기존 모델 설정의 파일 우선순위·다음 작업 연결 시 재읽기·유효하지 않은 변경 시 마지막 설정 유지 규칙을 따른다. 자동 재개한 worker는 저장한 모델 ID를 사용하고 출력·재시도 한도는 현재 유효 설정을 읽는다. 수동 **이어서 재시도**는 현재 세션의 모델·Provider 설정을 적용하며, 확정된 관계·메모와 해석 커서는 유지한다.
+관찰·관계 해석과 상세 행동 생성에는 앱이 출력 토큰 상한을 보내지 않는다. 출력 길이는 Provider의 기본 설정과 모델 문맥 한도를 따른다. 기존 `NEWERA_MAX_OUTPUT_TOKENS`·`NEWERA_REFLECTION_MAX_OUTPUT_TOKENS` 환경 변수와 `models.json`의 `maxOutputTokens`·`reflectionMaxOutputTokens`는 무시한다. 자동 재개한 worker는 저장한 모델 ID를 사용하고 재시도 한도는 현재 유효 설정을 읽는다. 수동 **이어서 재시도**는 현재 세션의 모델·Provider 설정을 적용하며, 확정된 관계·메모와 해석 커서는 유지한다.

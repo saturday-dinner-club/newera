@@ -13,6 +13,7 @@ export interface PublicProvider {
 	apiKeyEnv: string;
 	apiKeyConfigured: boolean;
 	models: ModelAlias[];
+	/** Legacy setting retained for saved providers and job snapshots; requests omit output token caps. */
 	outputTokenParameter: 'max_completion_tokens' | 'max_tokens';
 	structuredOutput: 'json_schema' | 'json_object';
 }
