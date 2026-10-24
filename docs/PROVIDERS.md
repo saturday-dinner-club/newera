@@ -23,6 +23,12 @@ API 키는 저장 후 브라우저에 다시 보내지 않습니다. 입력란�
 
 OpenAI 호환 생성 요청에는 OEV 전용 `input_type`, `reasoning_effort`, `temperature`를 보내지 않습니다. 모든 생성 Provider에 `max_completion_tokens`와 `max_tokens`를 생략하며 출력 길이는 Provider의 기본 설정과 모델 문맥 한도를 따릅니다. 기존 `outputTokenParameter`는 저장 데이터 호환을 위해 읽고 보존하지만 요청에는 적용하지 않습니다. JSON 객체 모드에서도 행동·대사 분리와 필드·실행 가능성 검증을 유지하며, 평문으로 자동 전환하지 않습니다. Provider가 선택한 구조화 출력 방식을 지원해야 합니다. 이 기능은 Chat Completions 호환 API를 대상으로 하며 Responses 전용 API는 지원하지 않습니다.
 
+## 시스템 프롬프트 구성
+
+행동·대사 생성, 관찰·관계 해석, 삽화 프롬프트 작성의 system 메시지는 `src/lib/server/prompts.ts`에서 Markdown 제목과 항목으로 조립합니다. 역할과 과제, 입력 해석, 관측 사실과 주관적 해석, 작업별 규칙, 출력 계약을 구분합니다. 공통 관측 규칙은 행동 생성과 관계 해석에서 공유합니다.
+
+화자 이름과 ID는 한 줄의 JSON 문자열로 인용하며, 로어북 문체 지침은 별도 인용 블록에 넣습니다. 문체 적용 범위는 그 다음 절에 명시합니다. 문체가 비어 있으면 해당 절을 생략합니다. 인물·관계·사건 등의 user 입력은 기존 JSON 형식을 유지하고, 모델의 응답은 기존 JSON Schema로 검증합니다. 프롬프트 문서의 Markdown 형식이 응답 형식을 바꾸지는 않습니다.
+
 ## 추론 로그
 
 앱 서버 stdout/stderr에 타임스탬프(`timestamp`, UTC ISO 8601)·수준(`level`)·이벤트(`event`)를 담은 JSON 한 줄씩 출력한다. 별도의 로그 수집기나 파일 저장은 추가하지 않는다.
