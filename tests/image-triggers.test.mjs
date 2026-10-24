@@ -22,7 +22,7 @@ test.after(() => { stage.store().close(); rmSync(directory, { recursive: true, f
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', 'base64');
 const config = { provider: 'openai', baseUrl: 'https://images.example.test/v1', apiKeyEnv: 'NEWERA_LORE_IMAGE_KEY', model: 'image-model', options: {}, stylePrompt: 'Watercolor.' };
 const preset = presets.saveImagePreset({ revision: 0, name: 'Unchanged image preset', config });
-const policy = (extra = {}) => ({ conditions: '새 장소 또는 중요한 만남이 생기거나 마지막 삽화 이후 게임 내 30분이 지났으면 새 삽화를 요청한다.', promptFormat: 'natural', promptInstructions: '영어로 현재 차림과 표정을 묘사한다.', ...extra });
+const policy = (extra = {}) => ({ conditions: '새 장소나 중요한 만남이 생기거나 게임 내 시각이 18시 이후인 장면을 삽화로 그린다.', promptFormat: 'natural', promptInstructions: '영어로 현재 차림과 표정을 묘사한다.', ...extra });
 const createWorld = (imageGeneration = policy()) => {
 	const definition = { ...exampleWorld(), imageGeneration };
 	const id = stage.importWorld(JSON.stringify({ format: 'newera-theater', version: 2, world: { definition }, saves: [] }));
@@ -82,8 +82,9 @@ test('System One skip performs neither prompt generation nor image API requests 
 	assert.equal(calls[0].body.questions.image_generation.type, 'choice'); assert.deepEqual(Object.keys(calls[0].body.questions.image_generation.criteria), ['generate', 'skip']);
 	assert.equal(calls[0].body.state.imageGeneration.conditions, policy().conditions);
 	assert.equal(images.queueImageCheck(id), null); assert.deepEqual(images.listIllustrations(id), []);
-	advance(id, 25); await processImageCheck(queue(id));
-	assert.equal(calls[1].body.state.elapsedMinutes, 30, 'skipped checks must not restart the elapsed-time baseline');
+	assert.deepEqual(calls[0].body.state.gameTime, { day: 1, hour: 18, minute: 5, tick: 1 });
+	advance(id, 360); await processImageCheck(queue(id));
+	assert.deepEqual(calls[1].body.state.gameTime, { day: 2, hour: 0, minute: 5, tick: 2 }, 'the accepted game clock crosses midnight without using elapsed time');
 });
 
 test('affirmative System One decision precedes a generated natural prompt and the selected image preset', async () => {
@@ -97,12 +98,18 @@ test('affirmative System One decision precedes a generated natural prompt and th
 	assert.equal(images.listIllustrations(id)[0].status, 'completed'); assert.equal(images.queueImageCheck(id), null);
 });
 
-test('tag format is passed to the writer and elapsed game minutes and the last image request reach System One', async () => {
+test('tag format is passed to the writer; legacy image request history is excluded from System One input', async () => {
 	const calls = mockPipeline({ prompt: 'theater, rain, red umbrella' }); const id = createWorld(policy({ promptFormat: 'tags' })); advance(id); await processImageCheck(queue(id));
 	assert.ok(calls[1].body.messages[0].content.includes('쉼표로 구분한 이미지 생성 태그'));
 	const writer = JSON.parse(calls[1].body.messages[1].content); assert.equal(writer.promptFormat, 'tags'); assert.equal(writer.promptInstructions, policy().promptInstructions); assert.ok(!('objectStates' in writer));
+	const cursor = images.getImageCursor(id);
+	stage.store().prepare('UPDATE theater_image_settings SET cursor_json=? WHERE world_id=?').run(JSON.stringify({ ...cursor, minute: 2525, startedMinute: 2520, lastRequest: { prompt: 'old prompt must stay out of the judgment' } }), id);
 	advance(id, 30); await processImageCheck(queue(id)); const state = calls[3].body.state;
-	assert.equal(state.elapsedMinutes, 30); assert.equal(state.previousRequest.prompt, 'theater, rain, red umbrella');
+	assert.deepEqual(Object.keys(state).sort(), ['gameTime', 'imageGeneration', 'objectStates', 'scene']);
+	assert.deepEqual(state.gameTime, { day: 1, hour: 18, minute: 35, tick: 2 });
+	assert.deepEqual(JSON.parse(state.scene).time, state.gameTime);
+	assert.ok(!JSON.stringify(state).includes('old prompt must stay out of the judgment'));
+	assert.deepEqual(Object.keys(images.getImageCursor(id)).sort(), ['eventId', 'revision', 'tick']);
 });
 
 test('invalid decision, malformed prompt and empty prompt fail closed without an image call', async () => {

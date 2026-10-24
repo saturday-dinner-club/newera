@@ -1,4 +1,5 @@
 import { createImageDirector } from '$lib/server/oev';
+import { imageGameTime } from '$lib/images/triggers';
 import { ImageGenerationError } from './common';
 import { generateWithImageConfig, ImageGenerationBusy, withImageGeneration } from './generate';
 import { acceptImageCheck, completeImageCheck, getImageCursor, imageCheckValid, pendingImageCheck, queueAutomaticImageChecks, recoverImageChecks, setImageCheckStatus, type ImageCheckJob } from './trigger-store';
@@ -17,7 +18,7 @@ export async function processImageCheck(job: ImageCheckJob): Promise<void> {
 			const cursor = getImageCursor(job.worldId);
 			if (scene.revision <= cursor.revision) { setImageCheckStatus(job.id, 'skipped'); return; }
 			const director = createImageDirector(models, AbortSignal.timeout(120000));
-			const generate = await director.shouldGenerate({ imageGeneration: policy, scene: scene.context, objectStates: scene.objectStates, lastCheck: { minute: cursor.minute, tick: cursor.tick, sceneId: cursor.sceneId }, previousRequest: cursor.lastRequest, elapsedMinutes: Math.max(0, scene.minute - (cursor.lastRequest?.minute ?? cursor.startedMinute ?? cursor.minute)) });
+			const generate = await director.shouldGenerate({ imageGeneration: policy, gameTime: imageGameTime(scene), scene: scene.context, objectStates: scene.objectStates });
 			if (!generate) { acceptImageCheck(job, null); return; }
 			if (!imageCheckValid(job)) { setImageCheckStatus(job.id, 'skipped'); return; }
 			setImageCheckStatus(job.id, 'prompting');

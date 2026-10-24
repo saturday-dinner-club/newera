@@ -78,6 +78,8 @@ test('lorebook System One decision gates prompt writing and persistent images wi
 		const body = JSON.parse(Buffer.concat(parts).toString()); response.setHeader('content-type', 'application/json');
 		if (request.url === '/v1/systemone') {
 			decisions++; assert.equal(body.questions.image_generation.type, 'choice'); assert.equal(body.state.imageGeneration.conditions, '첫 장면에서만 한 장을 생성한다.');
+			assert.deepEqual(body.state.gameTime, { day: 1, hour: 18, minute: decisions * 5, tick: decisions });
+			assert.deepEqual(Object.keys(body.state).sort(), ['gameTime', 'imageGeneration', 'objectStates', 'scene']);
 			response.end(JSON.stringify({ answers: { image_generation: { type: 'choice', choice: decisions === 1 ? 'generate' : 'skip' } } }));
 		} else if (request.url === '/v1/chat/completions') {
 			promptCalls++; assert.equal(body.response_format.json_schema.name, 'image_prompt');

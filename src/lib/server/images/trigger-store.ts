@@ -19,10 +19,12 @@ const policyKey = (world: World) => JSON.stringify({ pipeline: 2, presetId: worl
 function imageProgress(world: World): { revision: number; cursor: ImageTriggerCursor } {
 	const row = store().prepare('SELECT * FROM theater_image_settings WHERE world_id = ?').get(world.id) as Row | undefined;
 	const key = policyKey(world);
-	if (row && row.config_json === key) return { revision: Number(row.revision), cursor: JSON.parse(String(row.cursor_json)) };
+	if (row && row.config_json === key) {
+		const saved = JSON.parse(String(row.cursor_json)) as ImageTriggerCursor;
+		return { revision: Number(row.revision), cursor: { revision: saved.revision, tick: saved.tick, eventId: saved.eventId } };
+	}
 	const revision = Number(row?.revision ?? 0) + 1;
 	const cursor = imageTriggerCursor(world);
-	if (row) cursor.lastRequest = (JSON.parse(String(row.cursor_json)) as ImageTriggerCursor).lastRequest ?? null;
 	store().prepare('INSERT INTO theater_image_settings VALUES (?, ?, ?, ?) ON CONFLICT(world_id) DO UPDATE SET revision = excluded.revision, config_json = excluded.config_json, cursor_json = excluded.cursor_json')
 		.run(world.id, revision, key, JSON.stringify(cursor));
 	store().prepare("UPDATE theater_illustrations SET status = 'skipped' WHERE world_id = ? AND status IN ('pending', 'checking', 'prompting')").run(world.id);
@@ -85,7 +87,7 @@ export function acceptImageCheck(job: ImageCheckJob, prompt: string | null): boo
 		const cursor = getImageCursor(job.worldId);
 		if (job.input.scene.revision <= cursor.revision) { setImageCheckStatus(job.id, 'skipped'); return false; }
 		const scene = job.input.scene;
-		const next: ImageTriggerCursor = { revision: scene.revision, tick: scene.tick, eventId: scene.eventId, minute: scene.minute, startedMinute: cursor.startedMinute ?? cursor.minute, sceneId: scene.sceneId, lastRequest: prompt ? { tick: scene.tick, minute: scene.minute, sceneId: scene.sceneId, eventId: scene.eventId, prompt: prompt.slice(0, 2000) } : cursor.lastRequest };
+		const next: ImageTriggerCursor = { revision: scene.revision, tick: scene.tick, eventId: scene.eventId };
 		store().prepare('UPDATE theater_image_settings SET cursor_json = ? WHERE world_id = ? AND revision = ?').run(JSON.stringify(next), job.worldId, job.settingsRevision);
 		setImageCheckStatus(job.id, prompt ? 'generating' : 'skipped', prompt ? '로어북 조건에 따른 삽화' : '');
 		store().prepare("DELETE FROM theater_illustrations WHERE world_id = ? AND status = 'skipped' AND id != ?").run(job.worldId, job.id);
