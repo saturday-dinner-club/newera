@@ -176,8 +176,9 @@ test('scene play, typed decisions, multiple residents, object state, companions 
 		assert.equal(firstObservation.recentEvents.at(-1).body.utterance, '함께 준비할까요?');
 		page = await (await fetch(base)).text();
 		const seoyeonArticle = page.match(/<article\b[^>]*class="stage-event[^>]*>[\s\S]*?<\/article>/g).find((article) => article.includes('서연의 대답입니다.'));
-		assert.match(seoyeonArticle, /class="event-action"[\s\S]*?<p>서연은 고개를 끄덕인다\.<\/p>/);
-		assert.match(seoyeonArticle, /class="event-speech"[\s\S]*?<blockquote>서연의 대답입니다\.<\/blockquote>/);
+		assert.match(seoyeonArticle, /<p class="event-action">서연은 고개를 끄덕인다\.<\/p>/);
+		assert.match(seoyeonArticle, /<p class="event-speech"><q>서연의 대답입니다\.<\/q><\/p>/);
+		assert.ok(!seoyeonArticle.includes('선택 기록') && !seoyeonArticle.includes('event-content-label'));
 		assert.ok(!seoyeonArticle.includes('<p>서연은 고개를 끄덕인다.\n서연의 대답입니다.</p>'));
 		const transcript = await (await fetch(`${base}/session/export?worldId=${originalId}`)).text();
 		assert.match(transcript, /\*\*행동\*\*: 서연은 고개를 끄덕인다\./);
@@ -1121,6 +1122,10 @@ test('silent inactivity persists without public transcript rows across restart, 
 		await post(running.base, 'turn', { ...fields(), kind: 'wait' });
 		await waitJob(running.base, db, worldId);
 		assert.equal(snapshot().state.events.filter(e => e.decision?.choice === 'watch').length, 2);
+		const watchedPage = await (await fetch(running.base)).text();
+		const visibleArticles = watchedPage.match(/<article\b[^>]*class="stage-event[^>]*>[\s\S]*?<\/article>/g) ?? [];
+		assert.equal(visibleArticles.length, 2, 'player speech and deliberate waiting remain visible');
+		assert.ok(visibleArticles.every(article => !article.includes('주변을 지켜본다.')), 'passive NPC watching does not interrupt the transcript');
 		assert.ok(snapshot().state.events.filter(e => e.actorId !== 'player').every(e => e.text === '주변을 지켜본다.'));
 		await post(running.base, 'load', { ...fields(), slot: '1' });
 		assert.deepEqual(snapshot().state, silent.state);
@@ -1277,8 +1282,8 @@ test('exact repeats become silent idle across new input, restart and model chang
 		assert.equal(saved.events.filter(event => event.kind === 'wait').length, 0);
 		assert.equal(saved.tick, 3);
 		const page = await (await fetch(running.base)).text();
-		assert.equal((page.match(/<blockquote>이곳에서 기다릴게\.<\/blockquote>/g) ?? []).length, 1);
-		assert.equal((page.match(/<blockquote>이번에는 다른 말을 할게\.<\/blockquote>/g) ?? []).length, 1);
+		assert.equal((page.match(/<q>이곳에서 기다릴게\.<\/q>/g) ?? []).length, 1);
+		assert.equal((page.match(/<q>이번에는 다른 말을 할게\.<\/q>/g) ?? []).length, 1);
 		assert.match(page, /최근 비참여 선택: 아무것도 하지 않는다/);
 	} finally { await running.stop(); db.close(); model.closeAllConnections(); await new Promise(done => model.close(done)); }
 });

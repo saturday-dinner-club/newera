@@ -24,6 +24,7 @@
 	let resetError = $state('');
 	let historyElement = $state<HTMLDivElement>();
 	let objectsOpen = $state(true);
+	let showEventDetails = $state(false);
 	let scrollContext = '';
 	let scrollVersion = 0;
 	let followingHistory = true;
@@ -264,6 +265,7 @@
 		</div>
 
 		<div class="scene-tools">
+		<label class="event-details-toggle"><input type="checkbox" bind:checked={showEventDetails} />기록 정보 표시</label>
 		<details class="world-notes"><summary>세계관과 현재 인물의 기억</summary><p>{world.definition.description}</p><p>{world.definition.rules}</p>
 			{#each characters as instance}<h3>{instance.name}</h3>
 				{#if instance.inactivity}<p>최근 비참여 선택: {inactivityLabels[instance.inactivity.mode]} · 판단 {instance.inactivity.model}</p>{/if}
@@ -289,18 +291,28 @@
 
 		</div>
 		<div class="event-thread" aria-live="polite">
-			{#each events as event (event.id)}
+			{#each events as event, index (event.id)}
 				{@const eventScene = world.definition.scenes.find((entry) => entry.id === event.sceneId)}
 				{@const content = eventContent(event)}
 				{@const presentation = presentations.get(event.id)}
-				<article class="stage-event" class:player={event.actorId === 'player'} class:dialogue={event.kind === 'speak'}>
-					<div class="event-byline"><strong>{actorName(world, event.actorId)}</strong><span>{eventScene?.name} · {event.tick}</span>{#if event.targetId}<span>→ {actorName(world, event.targetId)}</span>{/if}</div>
-					{#if presentation}<CharacterIntroduction {presentation} characterId={event.actorId} />{/if}
-					{#if content.narrative}<div class="event-action"><span class="event-content-label">행동</span><p>{content.narrative}</p></div>{/if}
-					{#if content.utterance}<div class="event-speech"><span class="event-content-label">대사</span><blockquote>{content.utterance}</blockquote></div>{/if}
-					{#if event.changes && Object.keys(event.changes).length}<small class="state-change">{Object.entries(event.changes).map(([key, value]) => `${key}: ${value}`).join(' · ')}</small>{/if}
-					{#if event.decision}<details class="decision-detail"><summary>선택 기록</summary><small>{event.decision.acted === undefined ? '이전 판단' : event.decision.acted ? '행동한다' : '지켜본다'} · {event.decision.choice} · 판단 {event.decision.model}{#if event.decision.generationModel} · 생성 {event.decision.generationModel}{/if}</small></details>{/if}
-				</article>
+				{#if event.kind !== 'wait' || event.actorId === 'player'}
+					{#if index === 0 || events[index - 1].sceneId !== event.sceneId}
+						<h2 class="transcript-scene">{eventScene?.name ?? '무대'}</h2>
+					{/if}
+					<article class="stage-event" class:player={event.actorId === 'player'} class:dialogue={event.kind === 'speak'}>
+						<div class="event-byline"><strong>{actorName(world, event.actorId)}</strong>{#if event.targetId}<span>{actorName(world, event.targetId)}에게</span>{/if}</div>
+						{#if presentation}<CharacterIntroduction {presentation} characterId={event.actorId} />{/if}
+						{#if content.narrative}<p class="event-action">{content.narrative}</p>{/if}
+						{#if content.utterance}<p class="event-speech"><q>{content.utterance}</q></p>{/if}
+						{#if showEventDetails}
+							<div class="event-metadata">
+								<small>{eventScene?.name} · {event.tick}회</small>
+								{#if event.changes && Object.keys(event.changes).length}<small class="state-change">{Object.entries(event.changes).map(([key, value]) => `${key}: ${value}`).join(' · ')}</small>{/if}
+								{#if event.decision}<details class="decision-detail"><summary>선택 기록</summary><small>{event.decision.acted === undefined ? '이전 판단' : event.decision.acted ? '행동한다' : '지켜본다'} · {event.decision.choice} · 판단 {event.decision.model}{#if event.decision.generationModel} · 생성 {event.decision.generationModel}{/if}</small></details>{/if}
+							</div>
+						{/if}
+					</article>
+				{/if}
 				{#each illustrationsByEvent.get(event.id) ?? [] as illustration (illustration.id)}<IllustrationCard {illustration} onImageLoad={followIllustration} />{/each}
 			{:else}<div class="empty-stage"><p>아직 아무도 말을 꺼내지 않았다.</p><span>말을 걸거나, 주변 사물을 살피거나, 잠시 기다려 보세요.</span></div>{/each}
 			{#each otherIllustrations as illustration (illustration.id)}<IllustrationCard {illustration} onImageLoad={followIllustration} />{/each}

@@ -64,6 +64,8 @@ h1, h2, h3, h4 { color: #f1e9de; }
 .scene-heading { flex-shrink: 0; display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
 .history-scroll { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; overflow-anchor: none; scrollbar-gutter: stable; padding: 0 8px 18px 0; }
 .scene-tools { margin-top: 16px; }
+.event-details-toggle { display: flex; align-items: center; justify-content: flex-end; gap: 7px; color: var(--muted); font-size: 11px; cursor: pointer; }
+.event-details-toggle input { width: auto; margin: 0; accent-color: var(--accent); }
 .scene-tools .world-notes, .scene-tools .reader-footer { margin-top: 0; }
 .scene-heading h1 { margin: 0; font-size: 30px; font-weight: 500; letter-spacing: -.03em; }
 .scene-heading .eyebrow { margin-bottom: 11px; }
@@ -73,24 +75,26 @@ h1, h2, h3, h4 { color: #f1e9de; }
 .cast-strip > span { color: #bbb6ad; font-size: 11px; padding: 6px 10px; border: 1px solid #48474a; border-radius: 2px; }
 .cast-strip > .companion { color: #cbb18d; border-color: #71604a; }
 .event-introduction { margin: 14px 0; }
-.stage-event .event-introduction p { color: #c5bfb6; font-size: 13px; line-height: 1.95; margin: 10px 0; white-space: pre-line; overflow-wrap: anywhere; }
+.stage-event .event-introduction p { color: #c5bfb6; margin: 10px 0; white-space: pre-line; }
 .model-settings { padding-bottom: 12px; border-bottom: 1px solid var(--line); }
 .model-settings small { display: block; color: var(--muted); font-size: 11px; line-height: 1.8; overflow-wrap: anywhere; }
 .model-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; padding-top: 8px; }
 .model-buttons { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; }
 .model-buttons button { font-size: 12px; }
-.event-thread { margin: 16px 0 28px; }
-.stage-event { padding: 22px 0 22px 16px; border-bottom: 1px solid #303035; border-left: 2px solid transparent; }
-.stage-event.player { border-left-color: #5c5141; background: #211f1c; padding-right: 16px; }
-.event-byline { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
-.event-byline strong { font-size: 12px; color: #c9b38f; font-weight: 500; }
-.event-byline span { color: #86827c; font-size: 10px; }
-.stage-event p { font-size: 14px; line-height: 1.95; margin: 9px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-.event-action, .event-speech { margin-top: 14px; }
-.event-content-label { display: block; font-size: 10px; letter-spacing: .08em; color: var(--muted); }
-.stage-event .event-action p { color: #aaa69f; font-size: 13px; margin-top: 4px; }
-.event-speech blockquote { margin: 7px 0 0; padding: 8px 14px; border-left: 2px solid var(--accent); color: #eee7de; font-size: 15px; line-height: 1.95; white-space: pre-wrap; overflow-wrap: anywhere; background: #ffffff04; }
-.stage-event .state-change { display: block; color: #9b977a; margin-top: 10px; font-size: 11px; }
+.event-thread { max-width: 72ch; margin: 22px auto 36px; }
+.transcript-scene { display: flex; align-items: center; gap: 16px; margin: 32px 0 8px; color: var(--muted); font-size: 12px; font-weight: 400; }
+.transcript-scene::after { content: ''; flex: 1; border-top: 1px solid var(--line); }
+.stage-event { padding: 20px 0; }
+.event-byline { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.event-byline strong { font-size: 13px; color: #c9b38f; font-weight: 600; }
+.event-byline span { color: var(--muted); font-size: 11px; }
+.stage-event p { font-size: 16px; line-height: 2; margin: 10px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; word-break: keep-all; }
+.stage-event .event-action { color: #d3cfc8; }
+.stage-event .event-speech { color: #dfbd9e; margin-top: 16px; }
+.event-speech q { quotes: '“' '”' '‘' '’'; }
+.event-metadata { margin-top: 12px; padding-top: 8px; border-top: 1px dashed var(--line); color: var(--muted); }
+.event-metadata > small { display: block; font-size: 11px; }
+.stage-event .state-change { color: #9b977a; margin-top: 8px; }
 .decision-detail summary { font-size: 10px; color: #8f897d; padding: 9px 0 0; }
 .decision-detail small { display: block; color: #8f897d; margin-top: 9px; overflow-wrap: anywhere; }
 .empty-stage { padding: 54px 12px; color: #b4a89a; text-align: center; }
