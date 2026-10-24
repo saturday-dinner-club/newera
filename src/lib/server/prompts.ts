@@ -118,6 +118,28 @@ export const reflectionSystemPrompt = [
 	])
 ].join('\n\n');
 
+/** Correct only an observed output failure; transport failures retry the same prompt. */
+export function generationRetryGuidance(failure: { stage: string; code: string } | undefined, schemaGuidance: string, identityGuidance?: string): string | undefined {
+	if (!failure) return undefined;
+	switch (failure.stage) {
+		case 'json_parse':
+			return '이전 응답이 유효한 JSON이 아니었다. 코드 펜스·설명문 없이 출력 스키마를 따르는 JSON 객체 하나만 출력한다.';
+		case 'content':
+			return '이전 응답의 content가 비었거나 형식·길이 조건을 지키지 못했다. 출력 스키마의 필수 필드를 갖춘 간결하고 완전한 JSON 객체 하나만 출력한다.';
+		case 'finish_reason':
+			return failure.code === 'output_token_limit' ? '이전 응답이 출력 한도로 잘렸다. 필수 필드는 유지하고 불필요한 설명과 장문을 줄여 정상적으로 끝나는 완전한 JSON 객체를 출력한다.' : undefined;
+		case 'action_schema':
+		case 'reflection_schema':
+			return schemaGuidance;
+		case 'identity_review':
+			return `${identityGuidance ?? ''}\n\n이전 제안의 자기소개가 고정 화자의 정체성과 모순되었다. 자기 이름·역할을 지키고 타인의 정체성을 자기 것으로 말하지 않는다.`;
+		case 'performance_review':
+			return '이전 제안이 행동·대사 의미 검수를 통과하지 못했다. 플레이어의 답변·선택을 대신하거나 다른 사람의 역할로 답하지 않는다. 새 계기 없이 답을 기다리는 질문을 반복하지 말고 자기 역할과 실제 사건에 맞는 반응을 제안한다.';
+		default:
+			return undefined;
+	}
+}
+
 export function imagePromptSystemPrompt(format: 'tags' | 'natural'): string {
 	return [
 		'# 삽화 프롬프트 작성',

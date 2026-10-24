@@ -297,8 +297,11 @@ test('old-only relationship evidence is forbidden in the schema and retries rece
 					if (serverRejects) return json({ error: { code: 'invalid_model_output', message: 'schema validation failed' } }, 502);
 					return json({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(oldOnly) } }] });
 				}
-				assert.match(body.messages.at(-1).content, /수정 요청 1/);
-				assert.ok(body.messages.at(-1).content.includes(fresh.eventId));
+				if (serverRejects) assert.deepEqual(body.messages, requests[0].messages, 'HTTP 502 provides no validated relationship proposal to correct');
+				else {
+					assert.match(body.messages.at(-1).content, /수정 요청 1/);
+					assert.ok(body.messages.at(-1).content.includes(fresh.eventId));
+				}
 				return json({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({ relationshipUpdates: [], memoUpdate: null }) } }] });
 			};
 			assert.deepEqual(await (await createDirector(new AbortController().signal)).reflect(state, context), { relationshipUpdates: [], memoUpdate: null });
@@ -422,11 +425,59 @@ test('502 and invalid JSON regenerate only the failed call with exponential back
 		assert.equal((await director.perform(state, actions)).actionId, 'speak:player');
 		assert.equal(attempts.length, 3);
 		assert.deepEqual(attempts.map((attempt) => attempt.body.response_format), Array(3).fill(attempts[0].body.response_format));
-		assert.match(attempts[1].body.messages.at(-1).content, /수정 요청 1/);
-		assert.match(attempts[2].body.messages.at(-1).content, /수정 요청 2/);
+		assert.deepEqual(attempts[1].body.messages, attempts[0].body.messages, 'transport failures retry the same content without semantic corrections');
+		assert.match(attempts[2].body.messages.at(-1).content, /수정 요청 1.*유효한 JSON이 아니었다/);
+		assert.doesNotMatch(attempts[2].body.messages.at(-1).content, /자기소개|플레이어의 답변/);
 		assert.ok(attempts[1].time - attempts[0].time >= 14);
 		assert.ok(attempts[2].time - attempts[1].time >= 29);
 		assert.equal(calls.filter((call) => call.body?.questions?.participation).length, 1);
+	});
+});
+
+test('schema, truncated content and rejected meanings receive only their matching retry guidance', async () => {
+	await retrySettings(async () => {
+		for (const kind of ['schema', 'length', 'empty', 'identity', 'meaning']) {
+			provider(); const success = globalThis.fetch; const requests = [];
+			globalThis.fetch = async (url, init) => {
+				const body = init.body && JSON.parse(init.body);
+				if (String(url).endsWith('/chat/completions')) {
+					requests.push(body);
+					if (requests.length === 1) {
+						if (kind === 'schema') return json({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({ actionId: 'speak:player', targetId: 'player', utterance: '반가워.', memoUpdate: null }) } }] });
+						if (kind === 'length') return json({ choices: [{ finish_reason: 'length', message: { content: '{' } }] });
+						if (kind === 'empty') return json({ choices: [{ finish_reason: 'stop', message: { content: '' } }] });
+					}
+				}
+				if (requests.length === 1 && kind === 'identity' && body?.questions?.identity_check) return json({ answers: { identity_check: { type: 'choice', choice: 'contradiction' } } });
+				if (requests.length === 1 && kind === 'meaning' && body?.questions?.performance_check) return json({ answers: { performance_check: { type: 'choice', choice: 'revise' } } });
+				return success(url, init);
+			};
+			await (await createDirector(new AbortController().signal)).perform(state, actions);
+			assert.equal(requests.length, 2);
+			const correction = requests[1].messages.at(-1).content;
+			assert.match(correction, /수정 요청 1/);
+			assert.match(correction, { schema: /행동 출력 계약/, length: /출력 한도로 잘렸다/, empty: /content가 비었/, identity: /자기소개가 고정 화자의 정체성과 모순/, meaning: /행동·대사 의미 검수/ }[kind]);
+			if (kind !== 'identity' && kind !== 'meaning') assert.doesNotMatch(correction, /자기소개|다른 사람의 역할/);
+			if (kind === 'identity' || kind === 'meaning') assert.doesNotMatch(correction, /유효한 JSON이 아니었다|출력 한도로 잘렸다/);
+		}
+	});
+});
+
+test('a transport failure after an output correction repeats that corrected request without inventing a new correction', async () => {
+	await retrySettings(async () => {
+		provider(); const success = globalThis.fetch; const requests = [];
+		globalThis.fetch = async (url, init) => {
+			if (String(url).endsWith('/chat/completions')) {
+				requests.push(JSON.parse(init.body));
+				if (requests.length === 1) return json({ choices: [{ finish_reason: 'stop', message: { content: 'invalid JSON' } }] });
+				if (requests.length === 2) return json({ error: 'temporary failure' }, 503);
+			}
+			return success(url, init);
+		};
+		await (await createDirector(new AbortController().signal)).perform(state, actions);
+		assert.equal(requests.length, 3);
+		assert.match(requests[1].messages.at(-1).content, /수정 요청 1.*유효한 JSON/);
+		assert.deepEqual(requests[2].messages, requests[1].messages);
 	});
 });
 

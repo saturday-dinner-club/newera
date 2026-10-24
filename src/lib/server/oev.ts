@@ -12,7 +12,7 @@ import { aliasReference, providerCatalogRoute, providerRegistry, resolveProvider
 import type { ModelOption } from '$lib/providers/types';
 import type { ImageJudgmentInput } from '$lib/images/triggers';
 import { logInference, withInferenceLogContext, type InferenceDiagnostic } from './inference-log';
-import { imagePromptSystemPrompt, performanceSpeakerInstructions, performanceSystemPrompt, reflectionSystemPrompt } from './prompts';
+import { generationRetryGuidance, imagePromptSystemPrompt, performanceSpeakerInstructions, performanceSystemPrompt, reflectionSystemPrompt } from './prompts';
 
 export interface Settings extends RetryPolicy {
 	baseUrl: string;
@@ -370,6 +370,8 @@ export async function createDirector(signal: AbortSignal, models?: ModelSelectio
 		},
 		async reflect(state, context) {
 			let corrections = 0;
+			let correction: string | undefined;
+			const schemaGuidance = `이전 응답이 관찰·관계 출력 계약을 지키지 못했다. 각 관계 변경의 evidenceEventIds에는 이번 새 사건 ID ${JSON.stringify(context.newEvents.map((event) => event.eventId))} 중 하나 이상이 필요하다. 과거 발언이나 자기 행동만 근거로 재평가하지 않는다. 새 사건으로 바꿀 관계가 없으면 relationshipUpdates: []로 출력하고, 메모도 바꿀 이유가 없으면 memoUpdate: null로 둔다. 다른 필드와 JSON 스키마도 그대로 지킨다.`;
 			return withRetries('관찰·관계 해석', settings, signal, async () => {
 				checkpoint();
 				try {
@@ -379,12 +381,13 @@ export async function createDirector(signal: AbortSignal, models?: ModelSelectio
 						messages: [
 							{ role: 'system', content: reflectionSystemPrompt },
 							{ role: 'user', content: JSON.stringify(reflectionInput(state, context)) },
-							...(corrections ? [{ role: 'user', content: `수정 요청 ${corrections}: 이전 응답이 출력 계약 검증에 실패했다. 각 관계 변경의 evidenceEventIds에는 이번 새 사건 ID ${JSON.stringify(context.newEvents.map((event) => event.eventId))} 중 하나 이상이 필요하다. 과거 발언이나 자기 행동만 근거로 재평가하지 않는다. 새 사건으로 바꿀 관계가 없으면 relationshipUpdates: []로 출력하고, 메모도 바꿀 이유가 없으면 memoUpdate: null로 둔다. 다른 필드와 JSON 스키마도 그대로 지킨다.` }] : [])
+							...(correction ? [{ role: 'user', content: correction }] : [])
 						]
 					}, routes.text);
 					return generatedOutput(() => checkedReflection(structuredResponse(response), context), response, 'reflection_schema');
 				} catch (error) {
-					if (error instanceof RetryableError) corrections++;
+					const guidance = error instanceof RetryableError ? generationRetryGuidance(error.diagnostic, schemaGuidance) : undefined;
+					if (guidance) correction = `수정 요청 ${++corrections}: ${guidance}`;
 					throw error;
 				}
 			});
@@ -401,6 +404,8 @@ export async function createDirector(signal: AbortSignal, models?: ModelSelectio
 			logInference('info', '[생성 히스토리] 입력 구성', { model: textModel, ...(context.historyWindow as Record<string, unknown>), events: (context.history as unknown[]).length });
 			const speakerInstructions = performanceSpeakerInstructions(self);
 			let corrections = 0;
+			let correction: string | undefined;
+			const schemaGuidance = '이전 응답이 행동 출력 계약을 지키지 못했다. actionId는 availableActions에서 고르고 targetId는 그 행동의 대상과 일치시킨다. narrative·utterance의 종류와 필수 여부, memoUpdate를 포함한 모든 필드의 형식·길이와 JSON 스키마를 지킨다.';
 			const schema = performanceSchema(actions);
 			const systemPrompt = performanceSystemPrompt(self, writingStyle);
 			return withRetries('행동·대사 생성', settings, signal, async () => {
@@ -412,7 +417,7 @@ export async function createDirector(signal: AbortSignal, models?: ModelSelectio
 						messages: [
 							{ role: 'system', content: systemPrompt },
 							{ role: 'user', content: JSON.stringify({ ...context, availableActions: actions }) },
-							...(corrections ? [{ role: 'user', content: `수정 요청 ${corrections}: 이전 제안이 검증을 통과하지 못했다.\n\n${speakerInstructions}\n\n다른 사람의 질문을 플레이어 대신 대답하거나 미완성 이름을 출력하지 말고, 자기 역할에 맞는 새로운 말이나 행동을 JSON으로 제안한다.` }] : [])
+							...(correction ? [{ role: 'user', content: correction }] : [])
 						]
 					}, routes.text);
 					const expression = generatedOutput(() => checkedExpression(structuredResponse(response), actions), response, 'action_schema');
@@ -427,7 +432,8 @@ export async function createDirector(signal: AbortSignal, models?: ModelSelectio
 					});
 					return { ...expression, model: textModel };
 				} catch (error) {
-					if (error instanceof RetryableError) corrections++;
+					const guidance = error instanceof RetryableError ? generationRetryGuidance(error.diagnostic, schemaGuidance, speakerInstructions) : undefined;
+					if (guidance) correction = `수정 요청 ${++corrections}: ${guidance}`;
 					throw error;
 				}
 			});
