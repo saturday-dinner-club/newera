@@ -23,8 +23,24 @@ function recentEvents(state: Fields, count: number): Fields[] {
 }
 
 function relationships(state: Fields, events: Fields[], targets: string[] = []): Fields {
-	const relevant = new Set(['player', ...targets, ...list(state.present).map((actor) => actor.id), ...events.flatMap((event) => [event.actorId, event.targetId])]);
-	return Object.fromEntries(Object.entries(fields(fields(state.self).relationships)).filter(([id]) => relevant.has(id)).map(([id, value]) => [id, pick(value, ['trust', 'affinity', 'closeness', 'respect', 'wariness', 'impression'])]));
+	const self = fields(state.self);
+	const stored = fields(self.relationships);
+	const characters = list(state.present).filter((actor) => actor.kind !== 'object' && typeof actor.id === 'string').map((actor) => String(actor.id));
+	const defaults = new Set(['player', ...targets, ...characters].filter((id) => id !== self.id));
+	const relevant = new Set([...defaults, ...events.flatMap((event) => [event.actorId, event.targetId])]);
+	const selected: [string, Fields][] = Object.entries(stored).filter(([id]) => id !== self.id && relevant.has(id)).map(([id, value]) => [id, {
+		...pick(value, ['trust', 'affinity', 'closeness', 'respect', 'wariness', 'impression']), hasStoredRelationship: true
+	}]);
+	// Missing records mean strangers, rather than an invitation to invent a shared past. Never persist this projection.
+	for (const id of defaults) {
+		if (Object.hasOwn(stored, id)) continue;
+		selected.push([id, {
+			trust: null, affinity: null, closeness: null, respect: null, wariness: null,
+			impression: '모르는 사이(초면). 사전 친분은 없으며, 이번에 실제로 나눈 대화와 소개로 새로 알아간 범위만 따른다.',
+			hasStoredRelationship: false
+		}]);
+	}
+	return Object.fromEntries(selected);
 }
 
 function identity(state: Fields): Fields {
@@ -104,12 +120,14 @@ export function performanceContext(state: Fields, historyTokenLimit = defaultGen
 }
 
 export function performanceReviewContext(state: Fields, proposal: ActorExpression): Fields {
+	const events = recentEvents(state, 6);
+	const recalled = recalledContext(state, events, 8);
 	return {
 		identity: identity(state),
-		self: pick(state.self, ['id', 'name', 'description', 'state']),
+		self: { ...pick(state.self, ['id', 'name', 'description', 'state']), relationships: relationships(state, [...events, ...list(recalled.recalledEvents)]) },
 		present: list(state.present).map((actor) => pick(actor, ['id', 'name', 'kind'])),
-		recentEvents: labelledEvents(state, recentEvents(state, 6)),
-		...recalledContext(state, recentEvents(state, 6), 8),
+		recentEvents: labelledEvents(state, events),
+		...recalled,
 		proposal: pick(proposal, ['actionId', 'targetId', 'narrative', 'utterance', 'memoUpdate'])
 	};
 }

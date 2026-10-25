@@ -47,7 +47,8 @@ function mockPipeline({ decision = 'generate', prompt = 'A quiet theater entranc
 }
 
 test('lorebook image conditions and prompt format validate, round-trip through authoring, export, slots and import', () => {
-	assert.equal(validateDefinition(exampleWorld()).imageGeneration, undefined, 'old version 2 lorebooks stay valid');
+	const legacy = exampleWorld(); delete legacy.imageGeneration;
+	assert.equal(validateDefinition(legacy).imageGeneration, undefined, 'old version 2 lorebooks stay valid');
 	for (const imageGeneration of [policy({ promptFormat: 'other' }), policy({ conditions: 'x'.repeat(8001) }), policy({ promptInstructions: 'x'.repeat(4001) }), { ...policy(), apiKey: 'no' }]) assert.throws(() => validateDefinition({ ...exampleWorld(), imageGeneration }));
 	const bundle = buildBundle({ format: 'newera-theater-source', version: 2, definition: { ...exampleWorld(), imageGeneration: policy({ promptFormat: 'tags' }) } });
 	assert.equal(bundle.world.definition.imageGeneration.promptFormat, 'tags');
@@ -73,7 +74,8 @@ test('public prompt context excludes private character state while System One ca
 	character.state.secret = 'private-state'; character.memo = { summary: 'private-memo' }; character.memories = [{ text: 'private-memory' }];
 	const scene = imageSceneSnapshot(world);
 	for (const marker of ['private-state', 'private-memo', 'private-memory']) assert.ok(!JSON.stringify(scene).includes(marker));
-	assert.ok(!scene.context.includes('objectStates')); assert.deepEqual(imageGenerationPolicy({ ...world, definition: exampleWorld() }), { conditions: '', promptFormat: 'natural', promptInstructions: '' });
+	const legacy = exampleWorld(); delete legacy.imageGeneration;
+	assert.ok(!scene.context.includes('objectStates')); assert.deepEqual(imageGenerationPolicy({ ...world, definition: legacy }), { conditions: '', promptFormat: 'natural', promptInstructions: '' });
 });
 
 test('System One skip performs neither prompt generation nor image API requests and is not reevaluated on refresh', async () => {

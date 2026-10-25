@@ -80,7 +80,9 @@ test('each inference receives only its own context and keeps witnessed actions w
 	assert.ok(!('clothingPreferences' in participation.self));
 	assert.ok(!('foodPreferences' in participation.self));
 	assert.ok(!('reflectedThroughEventId' in participation.self));
-	assert.deepEqual(Object.keys(participation.self.relationships), ['peer']);
+	assert.deepEqual(Object.keys(participation.self.relationships), ['peer', 'player']);
+	assert.equal(participation.self.relationships.peer.hasStoredRelationship, true);
+	assert.equal(participation.self.relationships.player.hasStoredRelationship, false);
 	assert.ok(!('evidenceEventIds' in participation.self.relationships.peer));
 	assert.equal(participation.recentEvents.length, 8, 'six recent events plus the latest player and own records');
 	assert.equal(new Set(participation.recentEvents.map(event => event.eventId)).size, 8);
@@ -109,6 +111,32 @@ test('each inference receives only its own context and keeps witnessed actions w
 	assert.ok(!('recentEvents' in reflection));
 	assert.ok(!('memories' in reflection.self));
 	assert.deepEqual(input, before, 'projection never mutates saved character data');
+});
+
+test('actual model requests carry explicit stranger defaults through participation, reflection, generation and review', async () => {
+	const calls = provider();
+	const event = { eventId: 'new-greeting', actorId: 'player', targetId: 'actor', kind: 'speak', body: { narrative: null, utterance: '안녕하세요.' } };
+	const input = { ...state, self: { id: 'actor', name: '서연', relationships: {}, memories: [event] }, player: { id: 'player', present: true }, present: [{ id: 'harin', name: '하린', kind: 'character', description: '극장을 찾은 방문객', appearance: '파란 셔츠' }], recentEvents: [event] };
+	try {
+		const director = await createDirector(new AbortController().signal);
+		await director.reflect(input, { newEvents: [event], evidenceEvents: [event], targets: [{ id: 'player', name: '플레이어' }, { id: 'harin', name: '하린' }] });
+		await director.decide(input);
+		await director.perform(input, actions);
+		const participation = calls.find(call => call.body?.questions?.participation).body;
+		const review = calls.find(call => call.body?.questions?.performance_check).body;
+		const reflection = calls.find(call => call.body?.response_format?.json_schema?.name === 'character_reflection').body;
+		const performance = calls.find(call => call.body?.response_format?.json_schema?.name === 'actor_performance').body;
+		for (const modelInput of [participation.state, review.state, JSON.parse(reflection.messages[1].content), JSON.parse(performance.messages[1].content)]) {
+			assert.equal(modelInput.self.relationships.harin.hasStoredRelationship, false);
+			assert.equal(modelInput.self.relationships.player.hasStoredRelationship, false);
+		}
+		assert.ok(participation.questions.participation.instructions.includes('hasStoredRelationship'));
+		assert.ok(review.questions.performance_check.instructions.includes('hasStoredRelationship'));
+		assert.ok(reflection.messages[0].content.includes('hasStoredRelationship'));
+		assert.ok(performance.messages[0].content.includes('hasStoredRelationship'));
+		assert.equal(JSON.parse(performance.messages[1].content).present[0].appearance, '파란 셔츠');
+		assert.deepEqual(input.self.relationships, {});
+	} finally { globalThis.fetch = originalFetch; }
 });
 
 test('retrying an inactivity failure does not infer successful participation again', async () => {

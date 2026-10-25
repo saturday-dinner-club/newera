@@ -38,8 +38,9 @@ test('all lore presets preserve authored reaction profiles and opening arousal t
 	assert.equal(characters, 38);
 });
 
-test('the built-in opening uses the same reaction traits and initial arousal as the importable theater lore', () => {
+test('the built-in opening matches the importable theater reaction traits, initial arousal and image policy', () => {
 	const definition = exampleWorld(), source = read(examples[0][0]).definition;
+	assert.deepEqual(definition.imageGeneration, source.imageGeneration);
 	const state = initialState(definition);
 	for (const template of definition.templates.filter(template => template.kind === 'character')) {
 		assert.deepEqual(template.reactionProfile, source.templates.find(entry => entry.id === template.id).reactionProfile);

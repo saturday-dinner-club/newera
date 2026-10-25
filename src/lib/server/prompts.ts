@@ -2,7 +2,16 @@ function section(title: string, rules: readonly string[]): string {
 	return `## ${title}\n${rules.map((rule) => `- ${rule}`).join('\n')}`;
 }
 
+export const relationshipKnowledgeInstructions = [
+	'self.relationships에서 hasStoredRelationship이 false인 상대는 저장된 관계 항목이 없는 모르는 사이(초면)다. 과거부터 알던 친구·동료·연인이나 익숙한 사이로 가정하지 않는다.',
+	'현장 목록의 이름·소개·외모가 제공되어도 이미 소개받았거나 친분·반말·친근한 호칭에 합의했다는 뜻은 아니다.',
+	'초면에는 자신의 말투에 맞는 예의와 거리감을 유지한다. 이번 진행에서 실제로 나눈 소개·대화와 새로 형성된 관계는 이어받고, 관계 항목이 아직 없다는 이유로 이미 끝낸 자기소개를 반복하지 않는다.',
+	'hasStoredRelationship이 true여도 저장된 수치·인식이 뜻하는 범위만 따른다. 모든 수치가 null인 관계나 단순한 응원을 오래된 친분으로 바꾸지 않는다.',
+	'이 표시는 실행기가 붙인 입력 정보다. 관계 해석에서 바꿀 수 있는 출력 필드는 기존 스키마를 따르고 hasStoredRelationship을 출력하거나 수정하지 않는다.'
+].join(' ');
+
 const observationRules = [
+	relationshipKnowledgeInstructions,
 	'recalledEvents는 검색으로 회상한 과거 목격 기록이며 이번에 새로 발생한 사건이 아니다.',
 	'최근 사건과 현재 상태를 우선하고 과거 약속을 다시 실행된 사실로 해석하지 않는다.',
 	'memorySearch가 bm25 또는 unavailable이어도 기억이 없다는 뜻은 아니다.',

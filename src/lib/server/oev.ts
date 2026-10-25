@@ -12,7 +12,7 @@ import { aliasReference, providerCatalogRoute, providerRegistry, resolveProvider
 import type { ModelOption } from '$lib/providers/types';
 import type { ImageJudgmentInput } from '$lib/images/triggers';
 import { logInference, withInferenceLogContext, type InferenceDiagnostic } from './inference-log';
-import { generationRetryGuidance, imagePromptSystemPrompt, performanceSpeakerInstructions, performanceSystemPrompt, reflectionSystemPrompt } from './prompts';
+import { generationRetryGuidance, imagePromptSystemPrompt, performanceSpeakerInstructions, performanceSystemPrompt, reflectionSystemPrompt, relationshipKnowledgeInstructions } from './prompts';
 
 export interface Settings extends RetryPolicy {
 	baseUrl: string;
@@ -393,7 +393,7 @@ export async function createDirector(signal: AbortSignal, models?: ModelSelectio
 			});
 		},
 		async decide(state): Promise<ActorDecision> {
-			const choice = await choose('행동 여부 판단', 'participation', participationContext(state), '고정 화자는 identity.speakerName이다. recalledEvents는 검색한 오래된 목격 기억이지 이번에 새로 발생한 사건이 아니다. memorySearch 실패는 기억 부재를 뜻하지 않는다. 남이 player에게 한 질문에 플레이어 대신 답하지 않는다. 이미 플레이어에게 질문했고 답이 없으면 새로 끼어들 이유가 없는 한 기다린다. self의 성격·목표·현재 의도와 목격 사건으로 지금 새 말이나 행동을 할지만 고른다. actorId는 실제 주체, targetId는 대상이며 발언은 그 사람의 주장이다. 남의 행동·감정을 지어내지 않는다. 새 사건에는 다시 반응할 수 있지만 자기 발언을 의미 없이 반복하지 않는다. 중단 요청 수용도 자기 감정과 의도로 판단한다.', { act: '새 말이나 행동으로 참여한다.', wait: '새로 참여하지 않는다.' });
+			const choice = await choose('행동 여부 판단', 'participation', participationContext(state), relationshipKnowledgeInstructions + ' 고정 화자는 identity.speakerName이다. recalledEvents는 검색한 오래된 목격 기억이지 이번에 새로 발생한 사건이 아니다. memorySearch 실패는 기억 부재를 뜻하지 않는다. 남이 player에게 한 질문에 플레이어 대신 답하지 않는다. 이미 플레이어에게 질문했고 답이 없으면 새로 끼어들 이유가 없는 한 기다린다. self의 성격·목표·현재 의도와 목격 사건으로 지금 새 말이나 행동을 할지만 고른다. actorId는 실제 주체, targetId는 대상이며 발언은 그 사람의 주장이다. 남의 행동·감정을 지어내지 않는다. 새 사건에는 다시 반응할 수 있지만 자기 발언을 의미 없이 반복하지 않는다. 중단 요청 수용도 자기 감정과 의도로 판단한다.', { act: '새 말이나 행동으로 참여한다.', wait: '새로 참여하지 않는다.' });
 			if (choice === 'act') return { act: true, model: decisionModel };
 			const inactivity = await choose('비참여 태도 판단', 'inactivity', inactivityContext(state), '새로 참여하지 않기로 했다. 주의를 기울여 지켜보면 watch, 실제로 이미 하던 일을 이어가면 continue, 활동하거나 주시하지 않으면 idle이다. 목표·계획만으로 하던 일이 있다고 가정하지 않는다. 이전 inactivity는 영구 지시가 아니다. 이동·작업 완료·시간 진행을 확정하지 않는다.', { watch: '주변을 주의 깊게 지켜본다.', continue: '실제로 이미 하던 일을 계속한다.', idle: '아무것도 하지 않는다.' });
 			return { act: false, inactivity: inactivity as InactivityMode, model: decisionModel };
@@ -427,7 +427,7 @@ export async function createDirector(signal: AbortSignal, models?: ModelSelectio
 					await withInferenceLogContext({ parentRequestId: responseInfo.get(response)?.requestId }, async () => {
 						const identityCheck = await choose('화자 정체성 검수', 'identity_check', identityReviewContext(state, expression), '제안된 대사와 메모의 나는 고정 화자 speaker를 가리킨다. 대사가 화자의 이름·나이대·직업·역할과 모순되는 자기소개를 하는지 확인한다. 모순이 있으면 contradiction이다. 다른 사람의 자기소개를 화자가 자기 것처럼 답해도 contradiction이다.', { consistent: '이 제안의 자기소개는 고정 화자의 실제 정체성과 모순되지 않는다.', contradiction: '이 제안은 고정 화자와 다른 사람의 정체성으로 자기소개한다.' });
 						if (identityCheck !== 'consistent') rejectOutput(response, 'identity_review', 'identity_contradiction', '고정 화자의 이름·역할과 다른 정체성으로 생성되었습니다.');
-						const review = await choose('행동·대사 검수', 'performance_check', performanceReviewContext(state, expression), 'proposal을 기록하기 전에 검수한다. 고정 화자는 identity의 speaker뿐이다. 플레이어 이름·답변·선택을 대신 만들거나, 다른 사람의 역할로 답하거나, 새 계기 없이 이미 답을 기다리는 질문을 다시 묻는 제안은 revise다. 자기 이름·역할·알고 있는 사실과 충돌하거나 메모가 타인의 발언을 자기 경험으로 바꾸는 경우도 revise다. 과거 발언과 메모 자체가 주체 혼동일 수 있으므로 고정 정체성과 실제 actorId를 우선한다. 자기 역할에 맞는 제안은 accept다. 새 사건이나 격한 감정에 따른 의미 있는 반복과 실제로 관측한 것에 대한 반응은 허용한다.', { accept: '자기 역할과 사건 주체를 지키며 유효한 새 반응이다.', revise: '다른 역할의 답변·플레이어 대신 결정·주체 혼동·의미 없는 질문 반복을 수정해야 한다.' });
+						const review = await choose('행동·대사 검수', 'performance_check', performanceReviewContext(state, expression), relationshipKnowledgeInstructions + ' 초면인 상대와 과거부터 친했다는 제안은 revise다. 이번에 새로 알게 되거나 친해지자는 제안은 허용한다. proposal을 기록하기 전에 검수한다. 고정 화자는 identity의 speaker뿐이다. 플레이어 이름·답변·선택을 대신 만들거나, 다른 사람의 역할로 답하거나, 새 계기 없이 이미 답을 기다리는 질문을 다시 묻는 제안은 revise다. 자기 이름·역할·알고 있는 사실과 충돌하거나 메모가 타인의 발언을 자기 경험으로 바꾸는 경우도 revise다. 과거 발언과 메모 자체가 주체 혼동일 수 있으므로 고정 정체성과 실제 actorId를 우선한다. 자기 역할에 맞는 제안은 accept다. 새 사건이나 격한 감정에 따른 의미 있는 반복과 실제로 관측한 것에 대한 반응은 허용한다.', { accept: '자기 역할과 사건 주체를 지키며 유효한 새 반응이다.', revise: '다른 역할의 답변·플레이어 대신 결정·주체 혼동·의미 없는 질문 반복을 수정해야 한다.' });
 						if (review !== 'accept') rejectOutput(response, 'performance_review', 'review_rejected', '행동·대사가 화자·대상 또는 반복 검증을 통과하지 못했습니다.');
 					});
 					return { ...expression, model: textModel };

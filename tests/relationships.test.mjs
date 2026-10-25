@@ -5,11 +5,61 @@ import { initialState, beginTurn, observation } from '../src/lib/theater/runtime
 import { resolveTurn } from '../src/lib/theater/ensemble.ts';
 import { applyReflection, reflectionContext, unknownRelationship } from '../src/lib/theater/reflection.ts';
 import { checkedReflection, validateDefinition, validateState } from '../src/lib/theater/validation.ts';
+import { participationContext, performanceContext, performanceReviewContext, reflectionInput } from '../src/lib/theater/inference-context.ts';
 
 function world() { const definition = validateDefinition(exampleWorld()); return { id: 'relations', revision: 0, definition, state: initialState(definition) }; }
 const actor = (world, id) => world.state.instances.find((entry) => entry.id === id);
 const noop = { arousalUpdate: null, relationshipUpdates: [], memoUpdate: null };
 const update = (context, targetId = 'player') => ({ arousalUpdate: null, relationshipUpdates: [{ targetId, changes: [{ field: 'trust', value: 35 }], impression: '이번 약속은 확인해 보고 싶다.', evidenceEventIds: [context.newEvents[0].eventId] }], memoUpdate: null });
+
+test('missing relationship records explicitly mean strangers in decisions, generation, reflection and semantic review without changing saved state', () => {
+	const stage = world();
+	const seoyeon = actor(stage, 'seoyeon');
+	const before = structuredClone(stage);
+	const state = observation(stage, seoyeon);
+	const proposal = { actionId: 'speak:harin', targetId: 'harin', narrative: null, utterance: '처음 뵙겠습니다.', memoUpdate: null };
+	for (const input of [participationContext(state), performanceContext(state), performanceReviewContext(state, proposal), reflectionInput(state, { newEvents: [], evidenceEvents: [], targets: [{ id: 'harin', name: '하린' }] })]) {
+		const relation = input.self.relationships.harin;
+		assert.equal(relation.hasStoredRelationship, false);
+		assert.match(relation.impression, /모르는 사이/);
+		for (const field of ['trust', 'affinity', 'closeness', 'respect', 'wariness']) assert.equal(relation[field], null);
+		assert.equal(input.self.relationships['desk-bell'], undefined, 'objects receive no invented social relationships');
+		assert.equal(input.self.relationships.seoyeon, undefined, 'self receives no stranger entry');
+	}
+	const generated = performanceContext(state);
+	assert.equal(generated.present.find(entry => entry.id === 'harin').name, '하린');
+	assert.equal(generated.present.find(entry => entry.id === 'harin').description, state.present.find(entry => entry.id === 'harin').description);
+	assert.deepEqual(stage, before);
+	assert.equal(Object.hasOwn(seoyeon.relationships, 'harin'), false, 'prompt defaults must never become saved relationship records');
+});
+
+test('stored relationships remain directional and unevaluated saved records never turn into invented familiarity scores', () => {
+	const stage = world();
+	actor(stage, 'seoyeon').relationships.harin = { ...unknownRelationship(), trust: 20, impression: '오늘 처음 말을 나눈 방문객' };
+	const forward = performanceContext(observation(stage, actor(stage, 'seoyeon'))).self.relationships.harin;
+	const reverse = performanceContext(observation(stage, actor(stage, 'harin'))).self.relationships.seoyeon;
+	assert.equal(forward.hasStoredRelationship, true);
+	assert.equal(forward.trust, 20);
+	assert.equal(forward.impression, '오늘 처음 말을 나눈 방문객');
+	assert.equal(forward.affinity, null);
+	assert.equal(reverse.hasStoredRelationship, false);
+	assert.equal(reverse.trust, null);
+	const knownFriend = performanceContext(observation(stage, actor(stage, 'harin'))).self.relationships.player;
+	assert.equal(knownFriend.hasStoredRelationship, true);
+	assert.equal(knownFriend.closeness, 90);
+});
+
+test('an unsaved relationship default preserves actual introductions and conversation instead of erasing the current encounter', () => {
+	const stage = world();
+	const speech = beginTurn(stage, { kind: 'speak', text: '안녕하세요. 저는 오늘 공연을 보러 왔어요.', targetId: 'seoyeon' });
+	const self = actor(stage, 'seoyeon');
+	delete self.relationships.player;
+	const state = observation(stage, self);
+	const input = performanceContext(state);
+	assert.equal(input.self.relationships.player.hasStoredRelationship, false);
+	assert.ok(input.history.some(event => event.eventId === speech.id && event.body.utterance === speech.text));
+	assert.deepEqual(self.relationships, state.self.relationships);
+});
 
 test('initial relationships are directional instance state; old saves default to unknown without losing memories', () => {
 	const stage = world();
