@@ -1,5 +1,5 @@
 import { inactivityModes, relationshipMetrics } from './types.ts';
-import type { CharacterReflection, ReflectionContext, Relationships, RelationshipScores, RelationshipMetric, CharacterMemo, Condition, EntityInstance, EntityMemory, EntityTemplate, EventKind, Interaction, ModelSelection, ObjectReaction, Properties, Scene, Spawn, StageEvent, Value, WorldDefinition, WorldState } from './types.ts';
+import type { CharacterReflection, ReflectionContext, ReactionProfile, Relationships, RelationshipScores, RelationshipMetric, CharacterMemo, Condition, EntityInstance, EntityMemory, EntityTemplate, EventKind, Interaction, ModelSelection, ObjectReaction, Properties, Scene, Spawn, StageEvent, Value, WorldDefinition, WorldState } from './types.ts';
 import { memoryForEvent } from './memory.ts';
 
 export function record(value: unknown, label: string): Record<string, unknown> {
@@ -41,7 +41,7 @@ export function checkedRelationships(value: unknown): Relationships {
 }
 export function checkedReflection(value: unknown, context: ReflectionContext): CharacterReflection {
 	const source = record(value, '관찰 해석');
-	exactKeys(source, ['relationshipUpdates', 'memoUpdate'], '관찰 해석');
+	exactKeys(source, ['relationshipUpdates', 'memoUpdate', 'arousalUpdate'], '관찰 해석');
 	const targets = new Set(context.targets.map((target) => target.id));
 	const evidence = new Set(context.evidenceEvents.map((event) => event.eventId));
 	const fresh = new Set(context.newEvents.map((event) => event.eventId));
@@ -67,7 +67,22 @@ export function checkedReflection(value: unknown, context: ReflectionContext): C
 		if (!changes.length && impression === null) throw new Error('관계 갱신에 변경 내용이 없습니다.');
 		return { targetId, changes, impression, evidenceEventIds: [...new Set(evidenceEventIds)] };
 	});
-	return { relationshipUpdates, memoUpdate: source.memoUpdate === null ? null : checkedMemo(source.memoUpdate) };
+	let arousalUpdate: CharacterReflection['arousalUpdate'] = null;
+	if (source.arousalUpdate !== null) {
+		const update = record(source.arousalUpdate, '흥분도 갱신');
+		exactKeys(update, ['value', 'evidenceEventIds'], '흥분도 갱신');
+		const evidenceEventIds = list(update.evidenceEventIds, '흥분도 근거', 8).map((id) => text(id, '근거 사건 ID', 160));
+		if (!evidenceEventIds.some((id) => fresh.has(id)) || evidenceEventIds.some((id) => !evidence.has(id))) throw new Error('흥분도 갱신에는 새로 목격한 사건의 근거가 필요합니다.');
+		arousalUpdate = { value: integer(update.value, '흥분도', 100), evidenceEventIds: [...new Set(evidenceEventIds)] };
+	}
+	return { relationshipUpdates, memoUpdate: source.memoUpdate === null ? null : checkedMemo(source.memoUpdate), arousalUpdate };
+}
+export function checkedReactionProfile(value: unknown): ReactionProfile {
+	const source = record(value, '반응 성향');
+	exactKeys(source, ['baseSpeed', 'talkativeness'], '반응 성향');
+	const baseSpeed = integer(source.baseSpeed, '기본 반응 속도', 100);
+	if (baseSpeed < 1) throw new Error('기본 반응 속도는 1~100이어야 합니다.');
+	return { baseSpeed, talkativeness: integer(source.talkativeness, '말수 성향', 100) };
 }
 export function checkedModelSelection(value: unknown): ModelSelection {
 	const source = record(value, '모델 선택');
@@ -91,6 +106,10 @@ export function properties(value: unknown, label: string): Properties {
 function integer(value: unknown, label: string, maximum = Number.MAX_SAFE_INTEGER): number {
 	if (!Number.isSafeInteger(value) || Number(value) < 0 || Number(value) > maximum) throw new Error(`${label}: 정수 범위를 확인해 주세요.`);
 	return Number(value);
+}
+function finiteNumber(value: unknown, label: string, maximum = Number.MAX_VALUE): number {
+	if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > maximum) throw new Error(`${label}: 유한한 수치 범위를 확인해 주세요.`);
+	return value;
 }
 function boolean(value: unknown, label: string): boolean {
 	if (typeof value !== 'boolean') throw new Error(`${label}: 참거짓 값이 필요합니다.`);
@@ -126,6 +145,7 @@ function spawn(value: unknown): Spawn {
 	return { id: identifier(source.id, 'instance.id'), templateId: identifier(source.templateId, 'instance.templateId'), sceneId: identifier(source.sceneId, 'instance.sceneId'), name: text(source.name, 'instance.name', 200), companion: boolean(source.companion, 'instance.companion'),
 		...(source.appearance !== undefined ? { appearance: text(source.appearance, 'instance.appearance', 1200, true) } : {}),
 		...(source.playerContext !== undefined ? { playerContext: text(source.playerContext, 'instance.playerContext', 1200, true) } : {}),
+		...(source.arousal !== undefined ? { arousal: integer(source.arousal, '흥분도', 100) } : {}),
 		state: properties(source.state, 'instance.state'), relationships: checkedRelationships(source.relationships ?? {}) };
 }
 function validateRelationshipTargets(instance: Spawn, instances: Spawn[], templates: EntityTemplate[], initial = false): void {
@@ -149,6 +169,7 @@ export function validateDefinition(value: unknown): WorldDefinition {
 		return {
 			id: identifier(row.id, 'template.id'), kind: row.kind, name: text(row.name, 'template.name', 200), description: text(row.description, 'template.description'),
 			personality: text(row.personality, 'template.personality', 12000, true), goals: list(row.goals, 'template.goals', 30).map((goal) => text(goal, 'goal', 1000)),
+			...(row.reactionProfile !== undefined ? { reactionProfile: checkedReactionProfile(row.reactionProfile) } : {}),
 			...(row.baseAppearance !== undefined ? { baseAppearance: text(row.baseAppearance, 'template.baseAppearance', 400, true) } : {}),
 			...(row.clothingPreferences !== undefined ? { clothingPreferences: text(row.clothingPreferences, 'template.clothingPreferences', 1200, true) } : {}),
 			...(row.foodPreferences !== undefined ? { foodPreferences: text(row.foodPreferences, 'template.foodPreferences', 1200, true) } : {}),
@@ -170,6 +191,7 @@ export function validateDefinition(value: unknown): WorldDefinition {
 		const template = templates.find((candidate) => candidate.id === instance.templateId);
 		if (!template || !scenes.some((scene) => scene.id === instance.sceneId)) throw new Error('인스턴스의 원형 또는 씬이 존재하지 않습니다.');
 		validateRelationshipTargets(instance, spawns, templates, true);
+		if (template.kind !== 'character' && instance.arousal !== undefined) throw new Error('흥분도는 캐릭터에만 설정할 수 있습니다.');
 		if (instance.companion && (template.kind !== 'character' || instance.sceneId !== startingSceneId)) throw new Error('동행 캐릭터는 시작 씬에 배치해야 합니다.');
 	}
 	let appearanceChangeMinutes;
@@ -239,7 +261,14 @@ export function validateState(value: unknown, definition: WorldDefinition): Worl
 		if (memo && template.kind !== 'character') throw new Error('개인 메모는 캐릭터에만 저장할 수 있습니다.');
 		const reflectedThroughEventId = row.reflectedThroughEventId === undefined || row.reflectedThroughEventId === null ? null : text(row.reflectedThroughEventId, '관찰 해석 위치', 160);
 		if (reflectedThroughEventId && template.kind !== 'character') throw new Error('관찰 해석 위치는 캐릭터에만 저장할 수 있습니다.');
-		return { ...instance, active, memories, memo, relationships: instance.relationships ?? {}, reflectedThroughEventId, ...(appearanceSelection ? { appearanceSelection } : {}), ...(inactivity ? { inactivity } : {}) };
+		const reaction = template.kind === 'character' ? {
+			arousal: instance.arousal ?? 0,
+			arousalEvidenceEventIds: [...new Set(list(row.arousalEvidenceEventIds ?? [], '흥분도 근거', 8).map((id) => text(id, '근거 사건 ID', 160)))],
+			reactionGauge: finiteNumber(row.reactionGauge ?? 0, '행동 진행도', 100),
+			lastOpportunitySequence: integer(row.lastOpportunitySequence ?? 0, '마지막 판단 순번', integer(source.reactionSequence ?? 0, '판단 순번'))
+		} : {};
+		if (template.kind !== 'character' && ['arousal', 'arousalEvidenceEventIds', 'reactionGauge', 'lastOpportunitySequence'].some((key) => row[key] !== undefined)) throw new Error('반응 상태는 캐릭터에만 설정할 수 있습니다.');
+		return { ...instance, active, memories, memo, relationships: instance.relationships ?? {}, reflectedThroughEventId, ...reaction, ...(appearanceSelection ? { appearanceSelection } : {}), ...(inactivity ? { inactivity } : {}) };
 	}), 'instances');
 	const events = unique(list(source.events, 'events', 100000).map((entry): StageEvent => {
 		const row = record(entry, 'event');
@@ -299,9 +328,10 @@ export function validateState(value: unknown, definition: WorldDefinition): Worl
 		for (const relation of Object.values(instance.relationships)) {
 			if (relation.evidenceEventIds.some((id) => !witnessed.has(id))) throw new Error('관계의 근거 사건을 목격하지 않았습니다.');
 		}
+		if (instance.arousalEvidenceEventIds?.some((id) => !witnessed.has(id))) throw new Error('흥분도의 근거 사건을 목격하지 않았습니다.');
 		if (instance.reflectedThroughEventId && !instance.memories.some((memory) => 'body' in memory && memory.eventId === instance.reflectedThroughEventId && memory.kind !== 'wait' && memory.actorId !== instance.id)) throw new Error('관찰 해석 위치가 목격 사건과 일치하지 않습니다.');
 	}
 	const day = integer(source.day, 'day');
 	if (day < 1) throw new Error('날짜는 1일차부터 시작합니다.');
-	return { tick, day, minute: integer(source.minute, 'minute', 1439), activeSceneId, instances, events };
+	return { tick, day, minute: integer(source.minute, 'minute', 1439), activeSceneId, instances, events, reactionClock: finiteNumber(source.reactionClock ?? 0, '반응 시계'), reactionSequence: integer(source.reactionSequence ?? 0, '판단 순번') };
 }

@@ -57,7 +57,7 @@ export function participationContext(state: Fields): Fields {
 		identity: identity(state),
 		time: state.time,
 		scene: pick(state.scene, ['id', 'name', 'description']),
-		self: { ...pick(state.self, ['id', 'name', 'description', 'personality', 'goals', 'state', 'companion', 'memo', 'inactivity']), relationships: relationships(state, [...events, ...list(recalled.recalledEvents)]) },
+		self: { ...pick(state.self, ['id', 'name', 'description', 'personality', 'goals', 'arousal', 'reactionProfile', 'state', 'companion', 'memo', 'inactivity']), relationships: relationships(state, [...events, ...list(recalled.recalledEvents)]) },
 		player: state.player,
 		present: list(state.present).map((actor) => pick(actor, ['id', 'name', 'kind', 'state'])),
 		recentEvents: labelledEvents(state, events),
@@ -71,7 +71,7 @@ export function inactivityContext(state: Fields): Fields {
 	return {
 		time: state.time,
 		scene: pick(state.scene, ['id', 'name']),
-		self: { ...pick(self, ['id', 'name', 'state', 'inactivity']), memo: pick(self.memo, ['currentIntention', 'feelings']) },
+		self: { ...pick(self, ['id', 'name', 'state', 'arousal', 'inactivity']), memo: pick(self.memo, ['currentIntention', 'feelings']) },
 		present: list(state.present).map((actor) => pick(actor, ['id', 'name', 'kind'])),
 		recentEvents: recentEvents(state, 3)
 	};
@@ -96,7 +96,7 @@ export function performanceContext(state: Fields, historyTokenLimit = defaultGen
 	return {
 		identity: identity(state),
 		world: state.world, scene: state.scene, time: state.time, player: state.player, playerPresent: state.playerPresent,
-		self: { ...pick(state.self, ['id', 'name', 'description', 'personality', 'goals', 'state', 'companion', 'appearance', 'playerContext', 'memo', 'inactivity', 'clothingPreferences', 'foodPreferences']), relationships: relationships(state, [...events, ...list(recalled.recalledEvents)]) },
+		self: { ...pick(state.self, ['id', 'name', 'description', 'personality', 'goals', 'arousal', 'reactionProfile', 'state', 'companion', 'appearance', 'playerContext', 'memo', 'inactivity', 'clothingPreferences', 'foodPreferences']), relationships: relationships(state, [...events, ...list(recalled.recalledEvents)]) },
 		present: state.present,
 		history: history.events,
 		historyWindow: history.window
@@ -128,7 +128,7 @@ export function reflectionInput(state: Fields, context: ReflectionContext): Fiel
 	const ids = new Set(context.newEvents.map((event) => event.eventId));
 	return {
 		time: state.time, scene: pick(state.scene, ['id', 'name', 'description']),
-		self: { ...pick(state.self, ['id', 'name', 'description', 'personality', 'goals', 'state', 'memo']), relationships: relationships(state, context.evidenceEvents.map(fields), context.targets.map((target) => target.id)) },
+		self: { ...pick(state.self, ['id', 'name', 'description', 'personality', 'goals', 'arousal', 'reactionProfile', 'state', 'memo']), relationships: relationships(state, context.evidenceEvents.map(fields), context.targets.map((target) => target.id)) },
 		newEvents: context.newEvents,
 		pastEvents: context.evidenceEvents.filter((event) => !ids.has(event.eventId)),
 		targets: context.targets

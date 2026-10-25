@@ -22,6 +22,7 @@ export interface ObjectReaction {
 }
 export interface OutfitOption { id: string; name: string; appearance: string; context: string }
 export interface AppearanceSelection { day: number; minute?: number; sceneId?: string; outfitId: string | null; model: string }
+export interface ReactionProfile { baseSpeed: number; talkativeness: number }
 export interface EntityTemplate {
 	id: string;
 	kind: EntityKind;
@@ -33,6 +34,7 @@ export interface EntityTemplate {
 	clothingPreferences?: string;
 	foodPreferences?: string;
 	wardrobe?: OutfitOption[];
+	reactionProfile?: ReactionProfile;
 	initialState: Properties;
 	interactions: Interaction[];
 	reactions: ObjectReaction[];
@@ -50,6 +52,7 @@ export interface Spawn {
 	sceneId: string;
 	name: string;
 	companion: boolean;
+	arousal?: number;
 	/** Visible current appearance; separate from private state and impressions. */
 	appearance?: string;
 	/** Player-known starting relationship, not the character's private opinion. */
@@ -80,6 +83,7 @@ export interface ReflectionContext {
 export interface CharacterReflection {
 	relationshipUpdates: RelationshipUpdate[];
 	memoUpdate: CharacterMemo | null;
+	arousalUpdate: { value: number; evidenceEventIds: string[] } | null;
 }
 export interface ImageGenerationPolicy {
 	/** Lorebook instructions interpreted by the System One decision model. Empty disables automatic images. */
@@ -137,6 +141,9 @@ export interface EntityInstance extends Spawn {
 	appearanceSelection?: AppearanceSelection;
 	/** Latest non-participation choice; silent choices are private state, not witnessed events. */
 	inactivity?: InactivitySelection;
+	arousalEvidenceEventIds?: string[];
+	reactionGauge?: number;
+	lastOpportunitySequence?: number;
 }
 export interface CharacterMemo {
 	summary: string;
@@ -186,6 +193,9 @@ export interface WorldState {
 	activeSceneId: string;
 	instances: EntityInstance[];
 	events: StageEvent[];
+	/** Ordering time only; independent of game minutes and HTTP latency. */
+	reactionClock?: number;
+	reactionSequence?: number;
 }
 export interface ModelSelection {
 	decisionModel: string;
@@ -217,6 +227,13 @@ export interface TurnProgress {
 	pendingActorIds: string[];
 	completedDecisions: number;
 	consumedInputs: number;
+	/** Missing on legacy jobs, which finish using their original FIFO order. */
+	scheduler?: ReactionSchedule;
+}
+export interface ReactionSchedule {
+	version: 1;
+	priorityActorId: string | null;
+	reservation: { actorId: string; clock: number; speed: number } | null;
 }
 export interface GenerationJob {
 	id: string;

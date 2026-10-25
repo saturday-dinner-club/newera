@@ -4,10 +4,11 @@ import { nextPresentation } from './presentation.ts';
 
 export function initialState(definition: WorldDefinition): WorldState {
 	return {
-		tick: 0, day: 1, minute: 18 * 60, activeSceneId: definition.startingSceneId, events: [],
+		tick: 0, day: 1, minute: 18 * 60, activeSceneId: definition.startingSceneId, events: [], reactionClock: 0, reactionSequence: 0,
 		instances: definition.spawns.map((spawn) => ({
 			...structuredClone(spawn), active: true, memories: [], memo: null, relationships: structuredClone(spawn.relationships ?? {}), reflectedThroughEventId: null,
-			state: { ...definition.templates.find((template) => template.id === spawn.templateId)!.initialState, ...spawn.state }
+			state: { ...definition.templates.find((template) => template.id === spawn.templateId)!.initialState, ...spawn.state },
+			...(definition.templates.find((template) => template.id === spawn.templateId)!.kind === 'character' ? { arousal: spawn.arousal ?? 0, arousalEvidenceEventIds: [], reactionGauge: 0, lastOpportunitySequence: 0 } : {})
 		}))
 	};
 }
@@ -171,7 +172,7 @@ export function observation(world: World, actor: EntityInstance): Record<string,
 		world: { name: world.definition.name, description: world.definition.description, rules: world.definition.rules },
 		scene: world.definition.scenes.find((scene) => scene.id === actor.sceneId),
 		time: { tick: world.state.tick, day: world.state.day, minute: world.state.minute },
-		self: { ...actor, relationships: actor.relationships ?? {}, memories, description: template.description, personality: template.personality, goals: template.goals, clothingPreferences: template.clothingPreferences ?? '', foodPreferences: template.foodPreferences ?? '' },
+		self: { ...actor, reactionProfile: template.reactionProfile, relationships: actor.relationships ?? {}, memories, description: template.description, personality: template.personality, goals: template.goals, clothingPreferences: template.clothingPreferences ?? '', foodPreferences: template.foodPreferences ?? '' },
 		player: { id: 'player', name: '플레이어', present: actor.sceneId === world.state.activeSceneId },
 		present: residents(world, actor.sceneId).filter((other) => other.id !== actor.id).map((other) => ({
 			id: other.id, name: other.name, kind: templateFor(world, other).kind, description: templateFor(world, other).description,

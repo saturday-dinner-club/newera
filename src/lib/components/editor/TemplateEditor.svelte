@@ -19,6 +19,9 @@
 		<label>음식 취향<textarea name="foodPreferences" rows="3" maxlength="1200" value={template?.foodPreferences ?? ''} placeholder="좋아하고 꺼리는 맛과 메뉴. 개인적인 취향이며 다른 인물에게 자동 공개되지 않아요."></textarea></label>
 		<WardrobeEditor value={template?.wardrobe ?? []} />
 		<label>성격과 말투<textarea name="personality" rows="5" value={template?.personality ?? ''} placeholder="무엇을 중요하게 여기나요? 낯선 사람과 친구에게는 어떻게 말하나요?" maxlength="12000"></textarea></label>
+		<label>기본 반응 속도<input type="number" name="reactionBaseSpeed" min="1" max="100" step="1" value={template?.reactionProfile?.baseSpeed ?? 10} required /></label>
+		<label>말수 성향 · 0~100<input type="number" name="reactionTalkativeness" min="0" max="100" step="1" value={template?.reactionProfile?.talkativeness ?? 50} required /></label>
+		<p class="field-hint">속도와 말수 성향이 높으면 행동을 판단할 기회가 자주 돌아옵니다. 실제로 말할지는 인물이 결정하며, 현재 흥분도도 반응 속도에 영향을 줍니다.</p>
 		<label>바라는 것 · 한 줄에 하나씩<textarea name="goals" rows="3" value={template?.goals.join('\n') ?? ''} placeholder="공연 전에 마지막 장면을 맞춰본다"></textarea></label>
 	{/if}
 	<PropertiesEditor name="initialState" value={template?.initialState} title="처음 상태" />

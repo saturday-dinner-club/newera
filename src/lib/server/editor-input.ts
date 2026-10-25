@@ -1,6 +1,24 @@
-import { properties, record } from '$lib/theater/validation';
+import { checkedReactionProfile, properties, record } from '$lib/theater/validation';
 import { relationshipMetrics } from '$lib/theater/types';
 import type { RelationshipScores } from '$lib/theater/types';
+
+function numberField(body: FormData, name: string): number {
+	const value = body.get(name);
+	if (value === null || !String(value).trim()) throw new Error('반응 설정에 수치가 필요합니다.');
+	return Number(value);
+}
+
+export function reactionProfileFields(body: FormData) {
+	if (!body.has('reactionBaseSpeed') && !body.has('reactionTalkativeness')) return {};
+	return { reactionProfile: checkedReactionProfile({ baseSpeed: numberField(body, 'reactionBaseSpeed'), talkativeness: numberField(body, 'reactionTalkativeness') }) };
+}
+
+export function reactionStateFields(body: FormData): { arousal?: number } {
+	if (!body.has('arousal')) return {};
+	const arousal = numberField(body, 'arousal');
+	if (!Number.isInteger(arousal) || arousal < 0 || arousal > 100) throw new Error('흥분도는 0~100 정수여야 합니다.');
+	return { arousal };
+}
 
 export function jsonField(body: FormData, name: string, fallback: unknown = {}): unknown {
 	const value = String(body.get(name) || '');

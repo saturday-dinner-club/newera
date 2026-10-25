@@ -8,8 +8,8 @@ import { checkedReflection, validateDefinition, validateState } from '../src/lib
 
 function world() { const definition = validateDefinition(exampleWorld()); return { id: 'relations', revision: 0, definition, state: initialState(definition) }; }
 const actor = (world, id) => world.state.instances.find((entry) => entry.id === id);
-const noop = { relationshipUpdates: [], memoUpdate: null };
-const update = (context, targetId = 'player') => ({ relationshipUpdates: [{ targetId, changes: [{ field: 'trust', value: 35 }], impression: '이번 약속은 확인해 보고 싶다.', evidenceEventIds: [context.newEvents[0].eventId] }], memoUpdate: null });
+const noop = { arousalUpdate: null, relationshipUpdates: [], memoUpdate: null };
+const update = (context, targetId = 'player') => ({ arousalUpdate: null, relationshipUpdates: [{ targetId, changes: [{ field: 'trust', value: 35 }], impression: '이번 약속은 확인해 보고 싶다.', evidenceEventIds: [context.newEvents[0].eventId] }], memoUpdate: null });
 
 test('initial relationships are directional instance state; old saves default to unknown without losing memories', () => {
 	const stage = world();

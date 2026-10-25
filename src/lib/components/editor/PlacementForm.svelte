@@ -13,6 +13,8 @@
 	<input type="hidden" name="worldId" value={world.id} /><input type="hidden" name="revision" value={world.revision} /><input type="hidden" name="instanceId" value={source.id} />
 	<label>이름<input name="name" value={source.name} maxlength="200" required /></label>
 	{#if character}
+		<label>{scope === 'current' ? '현재 흥분도' : '시작 시 흥분도'} · 0~100<input type="number" name="arousal" min="0" max="100" step="1" value={source.arousal ?? 0} required /></label>
+		<p class="field-hint">흥분·긴장·각성 정도입니다. 높을수록 반응 기회가 자주 돌아오며 새 사건을 해석하면서 달라집니다.</p>
 		<label>겉모습과 옷차림<textarea name="appearance" rows="3" maxlength="1200" value={source.appearance ?? ''} placeholder="눈에 보이는 머리 모양, 옷차림, 소지품 등을 적어 주세요."></textarea></label>
 		<label>플레이어와의 처음 설정<textarea name="playerContext" rows="3" maxlength="1200" value={source.playerContext ?? ''} placeholder="예: 오늘 처음 만난, 학교 안내를 맡은 같은 반 학생."></textarea></label>
 		<p class="field-hint">플레이어가 아는 소개입니다. 상대의 비공개 속마음과 관계 수치는 아래 관계 편집에서 따로 다뤄요.</p>

@@ -54,8 +54,17 @@ export function reflectionSchema(context: ReflectionContext): Record<string, unk
 					}
 				}, required: ['targetId', 'changes', 'impression', 'evidenceEventIds']
 			} },
-			memoUpdate: memoUpdateSchema
-		}, required: ['relationshipUpdates', 'memoUpdate']
+			memoUpdate: memoUpdateSchema,
+			arousalUpdate: { anyOf: [{ type: 'null' }, {
+				type: 'object', additionalProperties: false,
+				properties: {
+					value: { type: 'integer', minimum: 0, maximum: 100 },
+					evidenceEventIds: { type: 'array', minItems: 1, maxItems: 8, uniqueItems: true,
+						items: { type: 'string', enum: context.evidenceEvents.map((event) => event.eventId) },
+						contains: { type: 'string', enum: context.newEvents.map((event) => event.eventId) }, minContains: 1 }
+				}, required: ['value', 'evidenceEventIds']
+			}] }
+		}, required: ['relationshipUpdates', 'memoUpdate', 'arousalUpdate']
 	};
 }
 
@@ -71,5 +80,9 @@ export function applyReflection(actor: EntityInstance, value: CharacterReflectio
 		actor.relationships[update.targetId] = relation;
 	}
 	if (reflection.memoUpdate) actor.memo = reflection.memoUpdate;
+	if (reflection.arousalUpdate) {
+		actor.arousal = reflection.arousalUpdate.value;
+		actor.arousalEvidenceEventIds = reflection.arousalUpdate.evidenceEventIds;
+	}
 	actor.reflectedThroughEventId = context.newEvents.at(-1)!.eventId;
 }

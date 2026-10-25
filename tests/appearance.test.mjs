@@ -23,7 +23,7 @@ const request = { kind: 'speak', text: '안녕', targetId: null };
 const say = stage => applyAction(stage, 'harin', { id: 'speak:player', kind: 'speak', targetId: 'player', label: '말한다' }, '안녕', undefined, { narrative: null, utterance: '안녕' });
 const director = overrides => ({
 	async chooseAppearance() { return { outfitId: 'uniform', model: 'decision-model' }; },
-	async reflect() { return { relationshipUpdates: [], memoUpdate: null }; },
+	async reflect() { return { arousalUpdate: null, relationshipUpdates: [], memoUpdate: null }; },
 	async decide() { return { act: false, model: 'decision-model' }; },
 	async perform() { throw Error('wait does not generate'); }, ...overrides
 });

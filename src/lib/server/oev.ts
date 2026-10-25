@@ -129,7 +129,7 @@ function responseSummary(response: Fields, sanitize: (message: string) => string
 }
 function outputDiagnostic(response: Fields, stage: string, code: string, reason: string): InferenceDiagnostic {
 	const info = responseInfo.get(response);
-	const expected = info?.schema === 'actor_performance' ? ['actionId', 'targetId', 'narrative', 'utterance', 'memoUpdate'] : info?.schema === 'character_reflection' ? ['relationshipUpdates', 'memoUpdate'] : info?.schema === 'image_prompt' ? ['prompt'] : [];
+	const expected = info?.schema === 'actor_performance' ? ['actionId', 'targetId', 'narrative', 'utterance', 'memoUpdate'] : info?.schema === 'character_reflection' ? ['relationshipUpdates', 'memoUpdate', 'arousalUpdate'] : info?.schema === 'image_prompt' ? ['prompt'] : [];
 	const parsed = fields(parsedOutputs.get(response));
 	const shape = expected.length && parsedOutputs.has(response) ? {
 		missingFields: expected.filter((key) => !Object.hasOwn(parsed, key)),
@@ -371,7 +371,7 @@ export async function createDirector(signal: AbortSignal, models?: ModelSelectio
 		async reflect(state, context) {
 			let corrections = 0;
 			let correction: string | undefined;
-			const schemaGuidance = `이전 응답이 관찰·관계 출력 계약을 지키지 못했다. 각 관계 변경의 evidenceEventIds에는 이번 새 사건 ID ${JSON.stringify(context.newEvents.map((event) => event.eventId))} 중 하나 이상이 필요하다. 과거 발언이나 자기 행동만 근거로 재평가하지 않는다. 새 사건으로 바꿀 관계가 없으면 relationshipUpdates: []로 출력하고, 메모도 바꿀 이유가 없으면 memoUpdate: null로 둔다. 다른 필드와 JSON 스키마도 그대로 지킨다.`;
+			const schemaGuidance = `이전 응답이 관찰·관계 출력 계약을 지키지 못했다. 각 관계 변경의 evidenceEventIds에는 이번 새 사건 ID ${JSON.stringify(context.newEvents.map((event) => event.eventId))} 중 하나 이상이 필요하다. 과거 발언이나 자기 행동만 근거로 재평가하지 않는다. 새 사건으로 바꿀 관계가 없으면 relationshipUpdates: []로 출력하고, 메모도 바꿀 이유가 없으면 memoUpdate: null로 둔다. arousalUpdate는 새 사건의 근거가 있는 0~100 흥분도 절대값과 evidenceEventIds 또는 null이어야 한다. 다른 필드와 JSON 스키마도 그대로 지킨다.`;
 			return withRetries('관찰·관계 해석', settings, signal, async () => {
 				checkpoint();
 				try {

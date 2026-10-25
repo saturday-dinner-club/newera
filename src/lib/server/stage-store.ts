@@ -201,13 +201,13 @@ export function editTemplate(id: string, revision: number, templateId: string, i
 		Object.assign(template, { name, description, personality, goals, initialState });
 		if (interactions !== undefined) template.interactions = interactions as typeof template.interactions;
 		if (reactions !== undefined) template.reactions = reactions as typeof template.reactions;
-		for (const key of ['baseAppearance', 'clothingPreferences', 'foodPreferences', 'wardrobe'] as const) {
+		for (const key of ['baseAppearance', 'clothingPreferences', 'foodPreferences', 'wardrobe', 'reactionProfile'] as const) {
 			if (Object.hasOwn(input, key)) Object.assign(template, { [key]: input[key] });
 		}
 	});
 }
 
-export function spawnInstance(id: string, revision: number, templateId: string, sceneId: string, name: string, companion: boolean, presentation: { appearance?: string; playerContext?: string } = {}): void {
+export function spawnInstance(id: string, revision: number, templateId: string, sceneId: string, name: string, companion: boolean, presentation: { appearance?: string; playerContext?: string; arousal?: number } = {}): void {
 	editWorld(id, revision, (world) => {
 		const template = world.definition.templates.find((candidate) => candidate.id === templateId);
 		if (!template) throw new Error('원형을 찾을 수 없습니다.');
@@ -218,7 +218,7 @@ export function spawnInstance(id: string, revision: number, templateId: string, 
 	});
 }
 
-export function editInstance(id: string, revision: number, instanceId: string, input: { name: string; sceneId: string; companion: boolean; state: unknown; relationships?: unknown; appearance?: string; playerContext?: string }): void {
+export function editInstance(id: string, revision: number, instanceId: string, input: { name: string; sceneId: string; companion: boolean; state: unknown; relationships?: unknown; appearance?: string; playerContext?: string; arousal?: number }): void {
 	editWorld(id, revision, (world) => {
 		const instance = world.state.instances.find((candidate) => candidate.id === instanceId);
 		if (!instance) throw new Error('인스턴스를 찾을 수 없습니다.');
@@ -226,12 +226,13 @@ export function editInstance(id: string, revision: number, instanceId: string, i
 		const { relationships, ...fields } = input;
 		const appearanceChanged = input.appearance !== undefined && input.appearance !== instance.appearance;
 		Object.assign(instance, { ...fields, state: record(input.state, '상태') });
+		if (input.arousal !== undefined) instance.arousalEvidenceEventIds = [];
 		if (appearanceChanged) instance.appearanceSelection = { day: world.state.day, minute: world.state.minute, sceneId: instance.sceneId, outfitId: null, model: 'manual' };
 		if (relationships !== undefined) instance.relationships = checkedRelationships(relationships);
 	});
 }
 
-export function editInitialInstance(id: string, revision: number, instanceId: string, input: { name: string; sceneId: string; companion: boolean; state: unknown; appearance?: string; playerContext?: string }): void {
+export function editInitialInstance(id: string, revision: number, instanceId: string, input: { name: string; sceneId: string; companion: boolean; state: unknown; appearance?: string; playerContext?: string; arousal?: number }): void {
 	editWorld(id, revision, (world) => {
 		const spawn = world.definition.spawns.find((spawn) => spawn.id === instanceId);
 		if (!spawn) throw new Error('처음 배치 설정을 찾을 수 없습니다.');
@@ -422,7 +423,7 @@ export function saveJobProgress(job: GenerationJob, workerId: string, world: Wor
 export function finishJob(job: GenerationJob, workerId: string): boolean {
 	return transaction(() => {
 		checkJob(job, workerId);
-		if (!job.progress || job.progress.pendingActorIds.length) throw new Error('아직 처리하지 않은 반응이 있습니다.');
+		if (!job.progress || job.progress.pendingActorIds.length || job.progress.scheduler?.reservation) throw new Error('아직 처리하지 않은 반응이 있습니다.');
 		if (nextJobInput(job, workerId, job.progress.consumedInputs)) return false;
 		store().prepare("UPDATE theater_jobs SET status = 'completed', completed_at = ? WHERE id = ? AND worker_id = ?").run(new Date().toISOString(), job.id, workerId);
 		return true;

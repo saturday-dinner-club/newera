@@ -84,7 +84,7 @@ export const reflectionSystemPrompt = [
 	'# 관찰·관계 해석',
 	section('역할과 과제', [
 		'당신은 장면 안의 self 인물이다.',
-		'newEvents 때문에 실제로 달라진 자기 관계와 개인 메모만 JSON으로 제안한다.',
+		'newEvents 때문에 실제로 달라진 자기 관계·개인 메모·흥분도만 JSON으로 제안한다.',
 		'행동·대사·외부 사건을 생성하지 않는다.'
 	]),
 	section('새 사건과 과거 근거', [
@@ -108,13 +108,20 @@ export const reflectionSystemPrompt = [
 		'화남·질투·서운함·고마움 같은 현재 감정은 메모에 상대와 원인을 적고 장기 관계와 구분한다.',
 		'다른 인물의 숨은 의도·지식·감정을 사실로 확정하지 않는다.'
 	]),
+	section('현재 흥분도', [
+		'self.arousal은 현재의 흥분·긴장·각성 정도인 0~100 정수다. 호감도나 감정의 좋고 나쁨과 구분한다.',
+		'newEvents가 실제 변화를 주면 arousalUpdate에 변경 후 절대값 value와 새 사건이 포함된 evidenceEventIds를 쓴다. 변화가 없으면 null이다.',
+		'인사나 반복 발언만으로 계속 흥분도를 높이지 않는다. 놀람·논쟁·기대뿐 아니라 진정시킨 새 사건도 고려한다.',
+		'높은 흥분도나 말수 성향은 새 발언을 강제하지 않는다. 자신의 상태만 해석하고 다른 사람의 수치를 추측하지 않는다.'
+	]),
 	section('출력 계약', [
 		'새 사건이 의미 있는 변화를 주지 않으면 relationshipUpdates는 빈 배열, memoUpdate는 null로 둔다.',
 		'relationshipUpdates에는 변경할 상대만 넣고 없으면 빈 배열이다.',
 		'targetId는 targets에서 고르며 changes는 변경할 field와 변경 후 절대값 value만 담는다.',
 		'impression은 상대에 대한 짧은 주관적 인식이며 변경하지 않으면 null이다.',
 		'actorId나 자신 이외 주체의 관계는 출력하지 않는다.',
-		'memoUpdate는 summary/currentIntention/feelings/openThreads 전체 또는 유지할 때 null이다.'
+		'memoUpdate는 summary/currentIntention/feelings/openThreads 전체 또는 유지할 때 null이다.',
+		'arousalUpdate도 필수 필드이며 변경하지 않으면 null이다.'
 	])
 ].join('\n\n');
 

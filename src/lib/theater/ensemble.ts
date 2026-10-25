@@ -4,6 +4,7 @@ import { memoryForEvent } from './memory.ts';
 import { applyReflection, reflectionContext } from './reflection.ts';
 import { applyAppearance, needsAppearance } from './appearance.ts';
 import { inactivityModes } from './types.ts';
+import { checkedReactionSchedule, consumeReaction, reserveReaction } from './reaction-scheduler.ts';
 import type { ActorPerformance, CharacterReflection, InactivityMode, OutfitOption, PlayerRequest, ReflectionContext, StageAction, TurnProgress, WitnessedEvent, World } from './types.ts';
 
 export interface ActorDecision { act: boolean; model: string; inactivity?: InactivityMode }
@@ -24,7 +25,7 @@ interface TurnExecution {
 export function restoredProgress(raw: unknown): TurnProgress | null {
 	if (!raw) return null;
 	const saved = raw as TurnProgress & { actorIds?: string[]; nextActorIndex?: number };
-	if (saved.pendingActorIds) return structuredClone(saved);
+	if (saved.pendingActorIds) return { ...structuredClone(saved), ...(saved.scheduler ? { scheduler: checkedReactionSchedule(saved.scheduler) } : {}) };
 	return { pendingActorIds: saved.actorIds!.slice(saved.nextActorIndex), completedDecisions: saved.nextActorIndex!, consumedInputs: 0 };
 }
 
@@ -42,7 +43,7 @@ export async function resolveTurn(original: World, request: PlayerRequest, direc
 		checkpoint();
 		beginTurn(draft, request);
 		const targetId = request.kind === 'speak' || request.kind === 'interact' ? request.targetId : null;
-		progress = { pendingActorIds: castIds(draft, targetId), completedDecisions: 0, consumedInputs: 0 };
+		progress = { pendingActorIds: castIds(draft, targetId), completedDecisions: 0, consumedInputs: 0, scheduler: { version: 1, priorityActorId: targetId, reservation: null } };
 		execution.onProgress?.(draft, progress);
 	}
 	while (true) {
@@ -54,11 +55,15 @@ export async function resolveTurn(original: World, request: PlayerRequest, direc
 			progress.consumedInputs++;
 			const targetId = input.kind === 'speak' || input.kind === 'interact' ? input.targetId : null;
 			progress.pendingActorIds = castIds(draft, targetId);
+			if (progress.scheduler) {
+				// The reserved readiness is durable, but a proposal made before this input is obsolete.
+				progress.scheduler.reservation = null;
+				progress.scheduler.priorityActorId = targetId;
+			}
 			execution.onProgress?.(draft, progress);
 			continue;
 		}
-		const actorId = progress.pendingActorIds[0];
-		if (!actorId) break;
+		if (!progress.pendingActorIds.length) break;
 		// Dress every newly encountered resident before anyone reasons about the scene.
 		const dressingActor = residents(draft).find((actor) => templateFor(draft, actor).kind === 'character' && templateFor(draft, actor).wardrobe?.length && needsAppearance(draft, actor));
 		if (dressingActor) {
@@ -77,12 +82,42 @@ export async function resolveTurn(original: World, request: PlayerRequest, direc
 			execution.onProgress?.(draft, progress);
 			continue;
 		}
+		if (progress.scheduler && !progress.scheduler.reservation) {
+			// Refresh every candidate's arousal before advancing ordering time, including slow candidates.
+			let prepared = false;
+			for (const id of progress.pendingActorIds) {
+				const candidate = draft.state.instances.find((entry) => entry.id === id && entry.active && entry.sceneId === draft.state.activeSceneId);
+				if (!candidate) continue;
+				const context = reflectionContext(draft, candidate);
+				if (!context) continue;
+				const state = observation(draft, candidate);
+				let reflection: CharacterReflection;
+				try { reflection = await director.reflect({ ...state, self: { ...(state.self as Record<string, unknown>), memories: context.evidenceEvents }, recentEvents: context.evidenceEvents }, context); }
+				catch (error) {
+					checkpoint();
+					if (execution.nextInput?.(progress.consumedInputs)) { prepared = true; break; }
+					throw error;
+				}
+				checkpoint();
+				if (!execution.nextInput?.(progress.consumedInputs)) {
+					applyReflection(candidate, reflection, context);
+					execution.onProgress?.(draft, progress);
+				}
+				prepared = true;
+				break;
+			}
+			if (prepared) continue;
+			reserveReaction(draft, progress);
+			execution.onProgress?.(draft, progress);
+			continue;
+		}
+		const actorId = progress.scheduler?.reservation?.actorId ?? progress.pendingActorIds[0];
 		const eventStart = draft.state.events.length;
 		const actor = draft.state.instances.find((candidate) => candidate.id === actorId);
 		if (actor?.active && actor.sceneId === draft.state.activeSceneId) {
 			const state = observation(draft, actor);
 			const context = reflectionContext(draft, actor);
-			if (context) {
+			if (context && !progress.scheduler) {
 				let reflection: CharacterReflection;
 				// A backlog batch must not see later memories through the ordinary recent-event window.
 				const reflectedState = { ...state, self: { ...(state.self as Record<string, unknown>), memories: context.evidenceEvents }, recentEvents: context.evidenceEvents };
@@ -145,9 +180,10 @@ export async function resolveTurn(original: World, request: PlayerRequest, direc
 				}
 			}
 		}
-		progress.pendingActorIds.shift();
+		if (progress.scheduler) consumeReaction(draft, progress, actorId);
+		progress.pendingActorIds = progress.pendingActorIds.filter((id) => id !== actorId);
 		progress.completedDecisions++;
-		// Peers react first; the performer also reconsiders after its committed action. Waiting wakes nobody.
+		// Waking an existing candidate never resets its accumulated readiness. Waiting wakes nobody.
 		const emitted = draft.state.events.slice(eventStart).filter((event) => event.kind !== 'wait');
 		const cast = castIds(draft);
 		for (const id of cast) {

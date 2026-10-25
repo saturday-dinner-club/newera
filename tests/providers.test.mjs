@@ -30,7 +30,7 @@ function fakeProvider() {
 			const key = Object.keys(body.questions)[0];
 			return json({ answers: { [key]: { type: 'choice', choice: key === 'identity_check' ? 'consistent' : key === 'performance_check' ? 'accept' : 'act' } } });
 		}
-		const output = body.response_format?.json_schema?.name === 'character_reflection' ? { relationshipUpdates: [], memoUpdate: null } : { actionId: 'speak:player', targetId: 'player', narrative: null, utterance: '안녕.', memoUpdate: null };
+		const output = body.response_format?.json_schema?.name === 'character_reflection' ? { arousalUpdate: null, relationshipUpdates: [], memoUpdate: null } : { actionId: 'speak:player', targetId: 'player', narrative: null, utterance: '안녕.', memoUpdate: null };
 		return json({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(output) } }] });
 	};
 	return calls;

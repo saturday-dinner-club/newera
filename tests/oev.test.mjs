@@ -43,7 +43,7 @@ function provider(options = {}) {
 			return json({ answers: { [key]: { type: key === 'inactivity' ? options.inactivityType ?? 'choice' : options.type ?? 'choice', choice: key === 'identity_check' ? 'consistent' : key === 'performance_check' ? options.reviewChoice ?? 'accept' : key === 'inactivity' ? options.inactivity ?? 'watch' : options.choice ?? 'act' } } });
 		}
 		if (body.response_format?.json_schema?.name === 'character_reflection') {
-			return json({ choices: [{ finish_reason: options.reflectionFinishReason ?? 'stop', message: { content: JSON.stringify(options.reflectionOutput ?? { relationshipUpdates: [], memoUpdate: null }) } }] });
+			return json({ choices: [{ finish_reason: options.reflectionFinishReason ?? 'stop', message: { content: JSON.stringify(options.reflectionOutput ?? { arousalUpdate: null, relationshipUpdates: [], memoUpdate: null }) } }] });
 		}
 		if (body.response_format?.json_schema?.name === 'image_prompt') {
 			return json({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({ prompt: 'A quiet theater.' }) } }] });
@@ -240,7 +240,7 @@ test('dynamic speaker names and multiline writing style stay inside their prompt
 test('reflection uses the selected generation model and strict schema before binary participation', async () => {
 	const event = { eventId: 'witnessed-1', actorId: 'player', targetId: null, kind: 'speak', body: { narrative: null, utterance: '약속할게.' } };
 	const context = { targets: [{ id: 'player', name: '플레이어' }], newEvents: [event], evidenceEvents: [event] };
-	const output = { relationshipUpdates: [{ targetId: 'player', changes: [{ field: 'trust', value: 45 }], impression: '직접 확인하고 싶다.', evidenceEventIds: ['witnessed-1'] }], memoUpdate: null };
+	const output = { arousalUpdate: { value: 65, evidenceEventIds: ['witnessed-1'] }, relationshipUpdates: [{ targetId: 'player', changes: [{ field: 'trust', value: 45 }], impression: '직접 확인하고 싶다.', evidenceEventIds: ['witnessed-1'] }], memoUpdate: null };
 	const calls = provider({ reflectionOutput: output, choice: 'wait' });
 	try {
 		const director = await createDirector(new AbortController().signal, { decisionModel: 'actor-model', textModel: 'gemma4-26b' });
@@ -255,7 +255,7 @@ test('reflection uses the selected generation model and strict schema before bin
 		assert.deepEqual(Object.keys(calls[2].body.questions), ['participation']);
 		assert.deepEqual(Object.keys(calls[3].body.questions), ['inactivity']);
 		assert.equal(calls[2].body.model, 'actor-model');
-		for (const invalid of [{ ...output, actorId: 'other' }, { relationshipUpdates: [{ ...output.relationshipUpdates[0], evidenceEventIds: ['unseen'] }], memoUpdate: null }]) {
+		for (const invalid of [{ ...output, actorId: 'other' }, { arousalUpdate: null, relationshipUpdates: [{ ...output.relationshipUpdates[0], evidenceEventIds: ['unseen'] }], memoUpdate: null }]) {
 			provider({ reflectionOutput: invalid });
 			const director = await createDirector(new AbortController().signal);
 			await assert.rejects(director.reflect(state, context));
@@ -275,7 +275,7 @@ test('reflection retries only the failed interpretation without invoking partici
 			return success(url, init);
 		};
 		const director = await createDirector(new AbortController().signal);
-		assert.deepEqual(await director.reflect(state, context), { relationshipUpdates: [], memoUpdate: null });
+		assert.deepEqual(await director.reflect(state, context), { arousalUpdate: null, relationshipUpdates: [], memoUpdate: null });
 		assert.equal(attempts, 2);
 		assert.equal(calls.filter((call) => call.url.endsWith('systemone')).length, 0);
 	});
@@ -286,7 +286,7 @@ test('old-only relationship evidence is forbidden in the schema and retries rece
 		const event = (eventId) => ({ eventId, actorId: 'player', targetId: null, kind: 'speak', body: { narrative: null, utterance: eventId } });
 		const old = event('already-processed'), fresh = event('new-greeting');
 		const context = { targets: [{ id: 'player', name: '플레이어' }], newEvents: [fresh], evidenceEvents: [old, fresh] };
-		const oldOnly = { relationshipUpdates: [{ targetId: 'player', changes: [{ field: 'trust', value: 70 }], impression: null, evidenceEventIds: [old.eventId] }], memoUpdate: null };
+		const oldOnly = { arousalUpdate: null, relationshipUpdates: [{ targetId: 'player', changes: [{ field: 'trust', value: 70 }], impression: null, evidenceEventIds: [old.eventId] }], memoUpdate: null };
 		for (const serverRejects of [false, true]) {
 			const requests = [];
 			provider(); const success = globalThis.fetch;
@@ -302,9 +302,9 @@ test('old-only relationship evidence is forbidden in the schema and retries rece
 					assert.match(body.messages.at(-1).content, /수정 요청 1/);
 					assert.ok(body.messages.at(-1).content.includes(fresh.eventId));
 				}
-				return json({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({ relationshipUpdates: [], memoUpdate: null }) } }] });
+				return json({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({ arousalUpdate: null, relationshipUpdates: [], memoUpdate: null }) } }] });
 			};
-			assert.deepEqual(await (await createDirector(new AbortController().signal)).reflect(state, context), { relationshipUpdates: [], memoUpdate: null });
+			assert.deepEqual(await (await createDirector(new AbortController().signal)).reflect(state, context), { arousalUpdate: null, relationshipUpdates: [], memoUpdate: null });
 			assert.equal(requests.length, 2);
 			const evidenceSchema = requests[0].response_format.json_schema.schema.properties.relationshipUpdates.items.properties.evidenceEventIds;
 			assert.deepEqual(evidenceSchema.items.enum, [old.eventId, fresh.eventId]);

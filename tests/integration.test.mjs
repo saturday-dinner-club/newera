@@ -19,9 +19,11 @@ function replyPerformanceReview(body, response) {
 	response.end(JSON.stringify({ answers: { performance_check: { type: 'choice', choice: 'accept' } } }));
 	return true;
 }
+const queueProgress = ({ scheduler, ...cursor }) => cursor;
+
 function replyReflection(body, response) {
 	if (body.response_format?.json_schema?.name !== 'character_reflection') return false;
-	response.end(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({ relationshipUpdates: [], memoUpdate: null }) } }] }));
+	response.end(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({ arousalUpdate: null, relationshipUpdates: [], memoUpdate: null }) } }] }));
 	return true;
 }
 const participationResponse = (choice, inactivity = 'watch') => JSON.stringify({ answers: { participation: { type: 'choice', choice }, inactivity: { type: 'choice', choice: inactivity } } });
@@ -69,6 +71,100 @@ async function waitJob(base, db, worldId, failure = false) {
 	}
 	assert.fail('job did not finish');
 }
+
+test('weighted worker preserves reserved opportunities across failure and restart, and editor settings round-trip through slots and export', async () => {
+	const directory = scratch();
+	let db, worldId, failedOnce = false;
+	const readState = () => JSON.parse(db.prepare('SELECT state_json FROM theater_worlds WHERE id = ?').get(worldId).state_json);
+	const model = createServer(async (request, response) => {
+		response.setHeader('content-type', 'application/json');
+		if (request.url === '/v1/models') { response.end(JSON.stringify({ data: [{ id: 'actor-model', task: 'generation' }] })); return; }
+		const chunks = []; for await (const chunk of request) chunks.push(chunk);
+		const body = JSON.parse(Buffer.concat(chunks).toString());
+		if (replyPerformanceReview(body, response)) return;
+		if (body.response_format?.json_schema?.name === 'character_reflection') {
+			assert.ok(body.response_format.json_schema.schema.required.includes('arousalUpdate'));
+			const state = JSON.parse(body.messages[1].content);
+			if (state.self.id === 'harin' && readState().reactionSequence === 25) {
+				const output = { relationshipUpdates: [], memoUpdate: null, arousalUpdate: { value: 90, evidenceEventIds: [state.newEvents.at(-1).eventId] } };
+				response.end(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(output) } }] })); return;
+			}
+			replyReflection(body, response); return;
+		}
+		if (body.questions) {
+			response.end(participationResponse(readState().reactionSequence < 25 ? 'act' : 'wait', 'idle')); return;
+		}
+		const state = JSON.parse(body.messages[1].content);
+		assert.ok(!state.present.some(entry => 'arousal' in entry || 'reactionGauge' in entry));
+		if (state.self.id === 'harin' && !failedOnce) {
+			failedOnce = true; response.statusCode = 503; response.end('{"error":"temporary failure"}'); return;
+		}
+		const output = { actionId: 'speak:player', targetId: 'player', narrative: null, utterance: `확정할 발언 ${readState().reactionSequence}`, memoUpdate: null };
+		response.end(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(output) } }] }));
+	});
+	const port = await listen(model);
+	let running = await app(directory, `http://127.0.0.1:${port}/v1`);
+	db = new DatabaseSync(join(directory, 'newera.sqlite'));
+	try {
+		const world = await current(running.base); worldId = db.prepare("SELECT value FROM theater_meta WHERE key = 'active'").get().value;
+		for (const [id, speed] of [['actor', 20], ['companion', 5]]) {
+			const source = world.definition.templates.find(entry => entry.id === id);
+			await post(running.base, 'template', { worldId, revision: String(db.prepare('SELECT revision FROM theater_worlds WHERE id=?').get(worldId).revision), templateId: id,
+				kind: 'character', name: source.name, description: source.description, personality: source.personality, goals: source.goals.join('\n'), initialState: JSON.stringify(source.initialState), reactionBaseSpeed: String(speed), reactionTalkativeness: '50' }, '/lores');
+		}
+		await post(running.base, 'turn', { worldId, revision: String(db.prepare('SELECT revision FROM theater_worlds WHERE id=?').get(worldId).revision), kind: 'wait' });
+		const failed = await waitJob(running.base, db, worldId, true);
+		assert.equal(failed.progress.scheduler.reservation.actorId, 'harin');
+		assert.equal(failed.progress.scheduler.reservation.clock, 20);
+		const before = readState();
+		assert.equal(before.reactionSequence, 3);
+		assert.equal(before.instances.find(entry => entry.id === 'harin').reactionGauge, 100);
+		await post(running.base, 'save', { worldId, slot: '1' });
+		const saved = await exported(running.base, worldId);
+		assert.equal(saved.saves[0].world.state.reactionClock, 20);
+		assert.equal(saved.world.definition.templates.find(entry => entry.id === 'actor').reactionProfile.baseSpeed, 20);
+		await running.stop(); running = await app(directory, `http://127.0.0.1:${port}/v1`);
+		const afterRestart = await latestJob(running.base, db, worldId);
+		assert.deepEqual(afterRestart.progress, failed.progress);
+		await post(running.base, 'retry', { worldId, revision: String(failed.revision), jobId: failed.id });
+		const finished = await waitJob(running.base, db, worldId);
+		const result = readState(), speeches = result.events.filter(event => event.kind === 'speak');
+		assert.equal(speeches.filter(event => event.actorId === 'seoyeon').length, 20);
+		assert.equal(speeches.filter(event => event.actorId === 'harin').length, 5);
+		assert.equal(result.reactionSequence, 27, '25 actions and two silent inactivity decisions');
+		assert.equal(finished.progress.completedDecisions, 27);
+		assert.equal(finished.progress.scheduler.reservation, null);
+		assert.equal(result.tick, 1);
+		assert.deepEqual(result.events.slice(0, before.events.length), before.events);
+		const harin = result.instances.find(entry => entry.id === 'harin');
+		assert.equal(harin.arousal, 90, 'provider reflection updates the actual persisted arousal state');
+		assert.ok(harin.arousalEvidenceEventIds.length);
+		const revision = () => String(db.prepare('SELECT revision FROM theater_worlds WHERE id=?').get(worldId).revision);
+		const placement = { worldId, instanceId: 'harin', name: harin.name, sceneId: harin.sceneId, companion: 'on', state: JSON.stringify(harin.state) };
+		await post(running.base, 'instance', { ...placement, revision: revision(), arousal: '60' }, '/lores');
+		await post(running.base, 'initialInstance', { ...placement, revision: revision(), arousal: '30' }, '/lores');
+		const edited = await exported(running.base, worldId);
+		assert.equal(edited.world.state.instances.find(entry => entry.id === 'harin').arousal, 60);
+		assert.equal(edited.world.definition.spawns.find(entry => entry.id === 'harin').arousal, 30);
+		const workshop = await (await fetch(`${running.base}/lores?tab=templates`)).text();
+		assert.ok(workshop.includes('name="reactionBaseSpeed"'));
+		await post(running.base, 'load', { worldId, revision: revision(), slot: '1' });
+		assert.equal(readState().reactionSequence, 3);
+		assert.equal(readState().instances.find(entry => entry.id === 'harin').reactionGauge, 100);
+		const upload = new FormData(); upload.append('file', new Blob([JSON.stringify(edited)]), 'weighted-world.json');
+		const importedResponse = await fetch(`${running.base}/lores?/importWorld`, { method: 'POST', headers: { origin: running.base }, body: upload });
+		assert.notEqual((await importedResponse.json()).type, 'failure');
+		const imported = await current(running.base);
+		assert.equal(imported.state.instances.find(entry => entry.id === 'harin').arousal, 60);
+		assert.equal(imported.definition.templates.find(entry => entry.id === 'companion').reactionProfile.baseSpeed, 5);
+		const importedId = db.prepare("SELECT value FROM theater_meta WHERE key = 'active'").get().value;
+		await post(running.base, 'reset', { worldId: importedId, revision: String(db.prepare('SELECT revision FROM theater_worlds WHERE id=?').get(importedId).revision) });
+		const reset = (await current(running.base)).state;
+		assert.equal(reset.instances.find(entry => entry.id === 'harin').arousal, 30);
+		assert.equal(reset.instances.find(entry => entry.id === 'harin').reactionGauge, 0);
+		assert.equal(reset.reactionSequence, 0);
+	} finally { await running.stop(); db.close(); model.closeAllConnections(); await new Promise(resolve => model.close(resolve)); }
+});
 
 test('lorebook System One decision gates prompt writing and persistent images with independent session preset selection', async () => {
 	let imageCalls = 0; let decisions = 0; let promptCalls = 0;
@@ -333,7 +429,7 @@ test('individual results are visible while the next inference is pending and res
 		assert.ok(held, 'the next actor must be waiting for generation');
 		const pending = await latestJob(running.base, db, worldId);
 		assert.equal(pending.status, 'running');
-		assert.deepEqual(pending.progress, { pendingActorIds: ['harin', 'seoyeon'], completedDecisions: 1, consumedInputs: 0 });
+		assert.deepEqual(queueProgress(pending.progress), { pendingActorIds: ['harin', 'seoyeon'], completedDecisions: 1, consumedInputs: 0 });
 		const partial = snapshot();
 		assert.equal(partial.revision, pending.revision);
 		assert.deepEqual(partial.state.events.map((event) => event.actorId), ['player', 'seoyeon']);
@@ -346,6 +442,10 @@ test('individual results are visible while the next inference is pending and res
 
 		await running.stop();
 		// Simulate a job persisted by the old one-pass release at this same durable boundary.
+		const legacyState = snapshot().state;
+		delete legacyState.reactionClock; delete legacyState.reactionSequence;
+		for (const instance of legacyState.instances) { delete instance.reactionGauge; delete instance.lastOpportunitySequence; }
+		db.prepare('UPDATE theater_worlds SET state_json = ? WHERE id = ?').run(JSON.stringify(legacyState), worldId);
 		db.prepare('UPDATE theater_jobs SET progress_json = ? WHERE id = ?').run(JSON.stringify({ actorIds: ['seoyeon', 'harin'], nextActorIndex: 1 }), pending.id);
 		db.prepare("UPDATE theater_jobs SET heartbeat_at = '2000-01-01T00:00:00.000Z' WHERE id = ?").run(pending.id);
 		running = await app(directory, `http://127.0.0.1:${modelPort}/v1`);
@@ -497,7 +597,7 @@ test('reactive dialogue repeats actors and queued stop chat survives restart wit
 		for (let index = 0; index < 300 && !held; index++) await pause(20);
 		assert.ok(held);
 		const pending = await latestJob(running.base, db, worldId);
-		assert.deepEqual(pending.progress, { pendingActorIds: ['harin', 'seoyeon'], completedDecisions: 3, consumedInputs: 0 });
+		assert.deepEqual(queueProgress(pending.progress), { pendingActorIds: ['harin', 'seoyeon'], completedDecisions: 3, consumedInputs: 0 });
 		const committed = snapshot();
 		assert.deepEqual(committed.events.filter((event) => event.kind === 'speak').map((event) => event.actorId), ['seoyeon', 'harin', 'seoyeon']);
 		const page = await (await fetch(running.base)).text();
@@ -635,7 +735,7 @@ test('private relationships persist before a wait decision, survive restart and 
 		assert.equal(body.response_format.json_schema.name, 'character_reflection');
 		const state = JSON.parse(body.messages[1].content);
 		reflections.push({ actor: state.self.id, ids: state.newEvents.map((event) => event.eventId), model: body.model });
-		const output = { relationshipUpdates: [], memoUpdate: null };
+		const output = { arousalUpdate: null, relationshipUpdates: [], memoUpdate: null };
 		if (state.self.id === 'harin') {
 			output.relationshipUpdates.push({ targetId: 'player', changes: [{ field: 'trust', value: 45 }], impression: '플레이어의 약속을 직접 확인하고 싶다.', evidenceEventIds: [invalid ? 'unseen-event' : state.newEvents.at(-1).eventId] });
 			output.memoUpdate = { summary: '플레이어의 말을 들었다.', currentIntention: '우선 조용히 확인한다.', feelings: ['플레이어의 약속이 걱정됨'], openThreads: [] };
@@ -1050,7 +1150,10 @@ test('world replacement replaces progress and slots without duplicates; deletion
 		assert.equal(count(), 2, 'replacement must not insert another world');
 		assert.equal(activeId(), id);
 		assert.equal(snapshot(id).definition.name, '교체 후 세계');
-		assert.deepEqual(snapshot(id).state, bundle.world.state, 'discard old progress entirely');
+		assert.deepEqual(snapshot(id).state, { ...bundle.world.state, reactionClock: 0, reactionSequence: 0,
+			instances: bundle.world.state.instances.map(instance => bundle.world.definition.templates.find(template => template.id === instance.templateId).kind === 'character'
+				? { ...instance, arousal: 0, arousalEvidenceEventIds: [], reactionGauge: 0, lastOpportunitySequence: 0 } : instance)
+		}, 'discard old progress entirely and initialize new reaction fields');
 		assert.equal(db.prepare('SELECT model_settings_json FROM theater_worlds WHERE id=?').get(id).model_settings_json, null);
 		assert.deepEqual(db.prepare('SELECT slot FROM theater_saves WHERE world_id=?').all(id).map(row => row.slot), [2]);
 		assert.equal(db.prepare('SELECT count(*) AS n FROM theater_jobs WHERE world_id=?').get(id).n, 0);

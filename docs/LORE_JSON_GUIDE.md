@@ -8,6 +8,8 @@
 
 현재 캐릭터 인스턴스는 선택적으로 `inactivity: { "mode": "continue", "tick": 1, "model": "판단 모델 ID" }`를 저장한다. `mode`는 `watch`·`continue`·`idle` 중 하나이고, 선택 시점은 현재 tick 이하여야 한다. `watch`는 지켜보는 wait 사건을 남긴다. `continue`와 `idle`은 사건·목격 기억·대사를 만들지 않으며, 실제 일을 완료하거나 오브젝트를 조작하지 않는다. 새 사건을 보고 다시 참여하면 이 비참여 상태를 해제한다. 타인의 비공개 상태는 관찰 입력에 공유하지 않는다. 초기 배치에 가짜 과거 선택을 넣지 않는다.
 
+캐릭터 원형에는 선택적 `reactionProfile: { "baseSpeed": 20, "talkativeness": 50 }`을 설정합니다. 기본 속도는 1~100 정수, 말수 성향은 0~100 정수이고 생략 시 각각 10·50입니다. 초기 배치의 `arousal`은 0~100 정수이며 기본 0입니다. 현재 인스턴스에는 `arousal`, `arousalEvidenceEventIds`, `reactionGauge`(0~100 유한 수), `lastOpportunitySequence`가 저장됩니다. 세계 상태의 `reactionClock`·`reactionSequence`와 함께 슬롯·내보내기에 보존합니다. 흥분도 근거는 실제 목격한 사건 ID여야 하며 초기 흥분도에는 과거 근거를 넣지 않습니다. [속도 계산과 복원 규칙](REACTION_SPEED_DESIGN.md)을 따릅니다.
+
 ## 파일 구성
 
 선택적 `world.definition.imageGeneration`은 로어북의 이미지 생성 지침이다. `{ "conditions": "중요한 만남이나 게임 내 18시 이후의 극장 입구를 그린다.", "promptFormat": "tags", "promptInstructions": "현재 겉모습을 영어 태그로 작성한다." }`처럼 지정한다. `conditions`는 최대 8000자, `promptInstructions`는 최대 4000자이며 `promptFormat`은 `tags` 또는 `natural`이다. 조건이 비어 있거나 생략되면 자동 이미지를 요청하지 않는다. 판단 모델의 System One 생성/생략 선택 후에만 생성 모델이 프롬프트를 작성한다. 이미지 프리셋 선택은 세션의 모델 설정에 따로 저장한다. 이 지침은 원본 빌더·저장 슬롯·내보내기·가져오기에 보존한다.
