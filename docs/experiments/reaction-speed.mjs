@@ -58,6 +58,9 @@ function simulateUntil(state, horizon) {
 
 async function existingQueueOrder() {
 	const definition = exampleWorld();
+	// Compare with the original equal-speed baseline, independently of authored lore tuning.
+	for (const template of definition.templates) if (template.kind === 'character') delete template.reactionProfile;
+	for (const spawn of definition.spawns) if (spawn.arousal !== undefined) spawn.arousal = 0;
 	const world = { id: 'speed-research', revision: 0, definition, state: initialState(definition) };
 	const order = [];
 	const stop = new Error('bounded research sample finished');

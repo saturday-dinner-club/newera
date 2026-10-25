@@ -315,7 +315,11 @@
           "gender": "여성"
         },
         "interactions": [],
-        "reactions": []
+        "reactions": [],
+        "reactionProfile": {
+          "baseSpeed": 12,
+          "talkativeness": 60
+        }
       },
       {
         "id": "ji-yu-profile",
@@ -360,7 +364,11 @@
           "gender": "여성"
         },
         "interactions": [],
-        "reactions": []
+        "reactions": [],
+        "reactionProfile": {
+          "baseSpeed": 16,
+          "talkativeness": 80
+        }
       },
       {
         "id": "da-in-profile",
@@ -405,7 +413,11 @@
           "gender": "여성"
         },
         "interactions": [],
-        "reactions": []
+        "reactions": [],
+        "reactionProfile": {
+          "baseSpeed": 7,
+          "talkativeness": 25
+        }
       },
       {
         "id": "su-a-profile",
@@ -452,7 +464,11 @@
           "gender": "여성"
         },
         "interactions": [],
-        "reactions": []
+        "reactions": [],
+        "reactionProfile": {
+          "baseSpeed": 10,
+          "talkativeness": 50
+        }
       },
       {
         "id": "do-gyeom-profile",
@@ -488,7 +504,11 @@
           "gender": "남성"
         },
         "interactions": [],
-        "reactions": []
+        "reactions": [],
+        "reactionProfile": {
+          "baseSpeed": 18,
+          "talkativeness": 85
+        }
       },
       {
         "id": "tae-jun-profile",
@@ -524,7 +544,11 @@
           "gender": "남성"
         },
         "interactions": [],
-        "reactions": []
+        "reactions": [],
+        "reactionProfile": {
+          "baseSpeed": 8,
+          "talkativeness": 30
+        }
       },
       {
         "id": "hye-won-profile",
@@ -560,7 +584,11 @@
           "gender": "여성"
         },
         "interactions": [],
-        "reactions": []
+        "reactions": [],
+        "reactionProfile": {
+          "baseSpeed": 14,
+          "talkativeness": 70
+        }
       },
       {
         "id": "eun-jae-profile",
@@ -596,7 +624,11 @@
           "gender": "여성"
         },
         "interactions": [],
-        "reactions": []
+        "reactions": [],
+        "reactionProfile": {
+          "baseSpeed": 9,
+          "talkativeness": 35
+        }
       },
       {
         "id": "min-seok-profile",
@@ -632,7 +664,11 @@
           "gender": "남성"
         },
         "interactions": [],
-        "reactions": []
+        "reactions": [],
+        "reactionProfile": {
+          "baseSpeed": 9,
+          "talkativeness": 30
+        }
       },
       {
         "id": "do-yun-profile",
@@ -668,7 +704,11 @@
           "gender": "남성"
         },
         "interactions": [],
-        "reactions": []
+        "reactions": [],
+        "reactionProfile": {
+          "baseSpeed": 10,
+          "talkativeness": 50
+        }
       },
       {
         "id": "assignment-screen-prop",
@@ -2138,7 +2178,8 @@
             "impression": "오리엔테이션에서 같은 학과 신입생으로 알게 됐다. 말이 편하지만 나를 대변할 사이는 아니다.",
             "evidenceEventIds": []
           }
-        }
+        },
+        "arousal": 25
       },
       {
         "id": "ji-yu",
@@ -2195,7 +2236,8 @@
             "impression": "신입생 대상 공개 전시에서 작업 설명을 들은 사진연구회 선배. 연인이나 썸 관계로 합의한 적은 없다.",
             "evidenceEventIds": []
           }
-        }
+        },
+        "arousal": 20
       },
       {
         "id": "da-in",
@@ -2252,7 +2294,8 @@
             "impression": "공개 동아리 안내에서 기타 연주를 들은 선배. 아직 가입이나 합주를 약속하지 않았다.",
             "evidenceEventIds": []
           }
-        }
+        },
+        "arousal": 15
       },
       {
         "id": "su-a",
@@ -2309,7 +2352,8 @@
             "impression": "반음 점주이자 아르바이트 고용주. 근무 문제는 명확히 이야기하지만 사생활 결정권을 맡기지는 않는다.",
             "evidenceEventIds": []
           }
-        }
+        },
+        "arousal": 15
       },
       {
         "id": "do-gyeom",
@@ -2339,7 +2383,8 @@
             "impression": "같은 교양의 다른 조 복학생. 아직 성격은 모른다.",
             "evidenceEventIds": []
           }
-        }
+        },
+        "arousal": 20
       },
       {
         "id": "tae-jun",
@@ -2369,7 +2414,8 @@
             "impression": "처음 보는 방문객. 먼저 무엇을 보러 왔는지 물어볼 수 있다.",
             "evidenceEventIds": []
           }
-        }
+        },
+        "arousal": 10
       },
       {
         "id": "hye-won",
@@ -2399,7 +2445,8 @@
             "impression": "처음 만나는 학생. 원하는 활동을 직접 듣고 싶다.",
             "evidenceEventIds": []
           }
-        }
+        },
+        "arousal": 20
       },
       {
         "id": "eun-jae",
@@ -2420,7 +2467,8 @@
             "impression": "이번 학기에 처음 수업을 듣는 학생. 수업 경험이 적다고 능력이나 책임감까지 단정하지 않는다.",
             "evidenceEventIds": []
           }
-        }
+        },
+        "arousal": 10
       },
       {
         "id": "min-seok",
@@ -2441,7 +2489,8 @@
             "impression": "처음 온 이용자. 사용 목적을 먼저 물어보면 된다.",
             "evidenceEventIds": []
           }
-        }
+        },
+        "arousal": 10
       },
       {
         "id": "do-yun",
@@ -2471,7 +2520,8 @@
             "impression": "처음 보는 손님. 메뉴나 좌석을 안내할 수 있다.",
             "evidenceEventIds": []
           }
-        }
+        },
+        "arousal": 10
       },
       {
         "id": "assignment-screen",

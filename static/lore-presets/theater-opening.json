@@ -46,6 +46,10 @@
           "goals": [
             "공연 전에 동료와 마지막 장면을 맞춰본다"
           ],
+          "reactionProfile": {
+            "baseSpeed": 10,
+            "talkativeness": 45
+          },
           "initialState": {
             "mood": "긴장함"
           },
@@ -61,6 +65,10 @@
           "goals": [
             "조명을 점검하고 공연을 준비한다"
           ],
+          "reactionProfile": {
+            "baseSpeed": 12,
+            "talkativeness": 35
+          },
           "initialState": {
             "mood": "집중함"
           },
@@ -76,6 +84,10 @@
           "goals": [
             "극장의 사람들을 알아가고 친구와 저녁을 보낸다"
           ],
+          "reactionProfile": {
+            "baseSpeed": 13,
+            "talkativeness": 75
+          },
           "initialState": {
             "mood": "기대함"
           },
@@ -169,7 +181,9 @@
           "sceneId": "lobby",
           "name": "서연",
           "companion": false,
-          "state": {}
+          "arousal": 35,
+          "state": {},
+          "relationships": {}
         },
         {
           "id": "jieun",
@@ -177,7 +191,9 @@
           "sceneId": "stage",
           "name": "지은",
           "companion": false,
-          "state": {}
+          "arousal": 15,
+          "state": {},
+          "relationships": {}
         },
         {
           "id": "harin",
@@ -185,7 +201,9 @@
           "sceneId": "lobby",
           "name": "하린",
           "companion": true,
-          "state": {}
+          "arousal": 20,
+          "state": {},
+          "relationships": {}
         },
         {
           "id": "rehearsal-light",
@@ -193,7 +211,8 @@
           "sceneId": "rehearsal",
           "name": "연습실 작업등",
           "companion": false,
-          "state": {}
+          "state": {},
+          "relationships": {}
         },
         {
           "id": "stage-light",
@@ -201,7 +220,8 @@
           "sceneId": "stage",
           "name": "무대 작업등",
           "companion": false,
-          "state": {}
+          "state": {},
+          "relationships": {}
         },
         {
           "id": "desk-bell",
@@ -209,7 +229,8 @@
           "sceneId": "lobby",
           "name": "안내 종",
           "companion": false,
-          "state": {}
+          "state": {},
+          "relationships": {}
         }
       ]
     },
@@ -219,6 +240,8 @@
       "minute": 1080,
       "activeSceneId": "lobby",
       "events": [],
+      "reactionClock": 0,
+      "reactionSequence": 0,
       "instances": [
         {
           "id": "seoyeon",
@@ -226,11 +249,18 @@
           "sceneId": "lobby",
           "name": "서연",
           "companion": false,
+          "arousal": 35,
           "state": {
             "mood": "긴장함"
           },
+          "relationships": {},
           "active": true,
-          "memories": []
+          "memories": [],
+          "memo": null,
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "jieun",
@@ -238,11 +268,18 @@
           "sceneId": "stage",
           "name": "지은",
           "companion": false,
+          "arousal": 15,
           "state": {
             "mood": "집중함"
           },
+          "relationships": {},
           "active": true,
-          "memories": []
+          "memories": [],
+          "memo": null,
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "harin",
@@ -250,11 +287,18 @@
           "sceneId": "lobby",
           "name": "하린",
           "companion": true,
+          "arousal": 20,
           "state": {
             "mood": "기대함"
           },
+          "relationships": {},
           "active": true,
-          "memories": []
+          "memories": [],
+          "memo": null,
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "rehearsal-light",
@@ -265,8 +309,11 @@
           "state": {
             "on": false
           },
+          "relationships": {},
           "active": true,
-          "memories": []
+          "memories": [],
+          "memo": null,
+          "reflectedThroughEventId": null
         },
         {
           "id": "stage-light",
@@ -277,8 +324,11 @@
           "state": {
             "on": false
           },
+          "relationships": {},
           "active": true,
-          "memories": []
+          "memories": [],
+          "memo": null,
+          "reflectedThroughEventId": null
         },
         {
           "id": "desk-bell",
@@ -289,8 +339,11 @@
           "state": {
             "rung": false
           },
+          "relationships": {},
           "active": true,
-          "memories": []
+          "memories": [],
+          "memo": null,
+          "reflectedThroughEventId": null
         }
       ]
     }

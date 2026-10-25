@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -33,6 +33,7 @@ function scratch() { const path = mkdtempSync(join(tmpdir(), 'newera-theater-int
 async function listen(server) { await new Promise((done) => server.listen(0, '127.0.0.1', done)); return server.address().port; }
 async function freePort() { const server = createServer(); const port = await listen(server); await new Promise((done) => server.close(done)); return port; }
 async function app(directory, provider, environment = {}) {
+	const fresh = !existsSync(join(directory, 'newera.sqlite'));
 	const port = await freePort();
 	const base = `http://127.0.0.1:${port}`;
 	let output = '';
@@ -43,6 +44,20 @@ async function app(directory, provider, environment = {}) {
 		try { const response = await fetch(base); if (response.ok) break; } catch { /* starting */ }
 		if (index === 99) { child.kill(); throw new Error(`app failed to start: ${output}`); }
 		await pause(50);
+	}
+	if (fresh) {
+		// General integration cases use an explicit equal-speed cast; the weighted case configures its own profiles.
+		const fixtures = new DatabaseSync(join(directory, 'newera.sqlite'));
+		try {
+			for (const row of fixtures.prepare('SELECT id, definition_json, state_json FROM theater_worlds').all()) {
+				const definition = JSON.parse(row.definition_json), state = JSON.parse(row.state_json);
+				const characters = new Set(definition.templates.filter(template => template.kind === 'character').map(template => template.id));
+				for (const template of definition.templates) if (characters.has(template.id)) template.reactionProfile = { baseSpeed: 10, talkativeness: 50 };
+				for (const spawn of definition.spawns) if (characters.has(spawn.templateId)) spawn.arousal = 0;
+				for (const instance of state.instances) if (characters.has(instance.templateId)) instance.arousal = 0;
+				fixtures.prepare('UPDATE theater_worlds SET definition_json=?,state_json=? WHERE id=?').run(JSON.stringify(definition), JSON.stringify(state), row.id);
+			}
+		} finally { fixtures.close(); }
 	}
 	return { base, child, async stop() { if (child.exitCode === null && child.signalCode === null) { const exited = once(child, 'exit'); child.kill(); await exited; } } };
 }
@@ -1152,7 +1167,7 @@ test('world replacement replaces progress and slots without duplicates; deletion
 		assert.equal(snapshot(id).definition.name, '교체 후 세계');
 		assert.deepEqual(snapshot(id).state, { ...bundle.world.state, reactionClock: 0, reactionSequence: 0,
 			instances: bundle.world.state.instances.map(instance => bundle.world.definition.templates.find(template => template.id === instance.templateId).kind === 'character'
-				? { ...instance, arousal: 0, arousalEvidenceEventIds: [], reactionGauge: 0, lastOpportunitySequence: 0 } : instance)
+				? { ...instance, arousal: instance.arousal ?? 0, arousalEvidenceEventIds: [], reactionGauge: 0, lastOpportunitySequence: 0 } : instance)
 		}, 'discard old progress entirely and initialize new reaction fields');
 		assert.equal(db.prepare('SELECT model_settings_json FROM theater_worlds WHERE id=?').get(id).model_settings_json, null);
 		assert.deepEqual(db.prepare('SELECT slot FROM theater_saves WHERE world_id=?').all(id).map(row => row.slot), [2]);

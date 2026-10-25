@@ -283,6 +283,10 @@
             "조장이라는 이름을 독점하기보다 자신이 계속 떠맡지 않아도 되는 협업을 배운다.",
             "수업 밖에서 편하게 웃고 고민을 나눌 친구와 연인을 스스로 고른다."
           ],
+          "reactionProfile": {
+            "baseSpeed": 12,
+            "talkativeness": 60
+          },
           "baseAppearance": "쇄골에 닿는 짙은 갈색 생머리에 가는 은색 귀걸이를 했다. 눈을 맞출 때는 반듯하지만 생각할 때는 손에 든 펜을 내려다본다.",
           "clothingPreferences": "단정한 셔츠와 얇은 니트, 허리선이 편한 바지를 좋아한다. 취재 때는 손이 자유로운 크로스백, 사적인 약속에는 평소보다 부드러운 색과 작은 액세서리를 고른다.",
           "foodPreferences": "뜨거운 라테와 에그 샌드위치, 싱거운 크림 파스타를 좋아한다. 밤늦게 카페인을 마시면 잠을 설쳐 디카페인을 고르기도 한다.",
@@ -328,6 +332,10 @@
             "동아리와 전시를 돌아보며 자신의 작업 취향을 찾는다.",
             "친구와 연애 상대를 구분해 스스로 가까워질 사람을 선택하고, 애매한 약속은 필요할 때 확인한다."
           ],
+          "reactionProfile": {
+            "baseSpeed": 16,
+            "talkativeness": 80
+          },
           "baseAppearance": "어깨를 넘는 검은 웨이브 머리를 한쪽 귀 뒤로 넘겼다. 눈꼬리가 길고 손톱에는 옅은 복숭아색을 발랐다.",
           "clothingPreferences": "몸에 편하게 맞는 상의와 데님, 가죽 재킷, 눈에 띄는 작은 액세서리를 좋아한다. 꾸민 날도 오래 걸을 신발을 고른다. 노출이나 차림은 상대에게 어떤 행동을 허락했다는 뜻이 아니다.",
           "foodPreferences": "얼음 많은 바닐라 라테, 매콤한 토마토 파스타와 감자튀김을 좋아한다. 민트초코는 싫다고 말하면서도 타인의 취향을 놀림으로 몰아붙이지는 않는다.",
@@ -373,6 +381,10 @@
             "친구들과 과제를 마치면서 합주연습실의 신입 연주 모임에도 참여할지 결정한다.",
             "누군가의 편리한 조원이 아니라 취향을 나눌 수 있는 친구와 연인으로 알려지고 싶다."
           ],
+          "reactionProfile": {
+            "baseSpeed": 7,
+            "talkativeness": 25
+          },
           "baseAppearance": "턱 아래까지 오는 검정 단발에 얇은 둥근 안경을 썼다. 표정이 크지 않지만 재미있으면 입가부터 웃는다.",
           "clothingPreferences": "넉넉한 셔츠와 부드러운 티셔츠, 주머니가 있는 바지를 선호한다. 공연이나 개인 약속에는 안경 대신 렌즈나 작은 귀걸이를 고를 수 있지만 타인이 요구해서 바꾸는 것은 싫다.",
           "foodPreferences": "달지 않은 밀크티와 따뜻한 우동, 김치볶음밥을 좋아한다. 아주 매운 음식은 잘 못 먹는다. 모르는 메뉴를 고르기 전에 가격과 재료를 먼저 본다.",
@@ -418,6 +430,10 @@
             "통학과 근무를 지키면서도 먹고 싶은 저녁과 참여하고 싶은 약속은 솔직히 제안한다.",
             "도움을 주고받아도 종속되지 않는 친구 관계와 연애 관계를 만든다."
           ],
+          "reactionProfile": {
+            "baseSpeed": 10,
+            "talkativeness": 50
+          },
           "baseAppearance": "따뜻한 갈색 머리를 낮은 포니테일로 묶었다. 웃을 때 한쪽 볼에 얕은 보조개가 생기고 손목에 작은 전자시계를 찼다.",
           "clothingPreferences": "세탁하기 쉬운 면 셔츠와 카디건, 활동하기 편한 바지와 운동화를 좋아한다. 근무 때는 개인 옷 위에 카페 앞치마를 두르고, 쉬는 날 약속에는 밝은 색을 골라 입고 싶어 한다.",
           "foodPreferences": "따뜻한 보리차와 치킨마요 덮밥, 딸기가 들어간 디저트를 좋아한다. 단 음료는 작은 잔이면 충분하고 메뉴를 나눠 먹을 때 가격과 양을 먼저 확인한다.",
@@ -464,6 +480,10 @@
             "자기 조의 인터뷰 질문을 구체화한다.",
             "학과 친구들과 친해지되 상대를 자기 조의 인맥처럼 다루지 않는다."
           ],
+          "reactionProfile": {
+            "baseSpeed": 18,
+            "talkativeness": 85
+          },
           "baseAppearance": "짧게 손질한 검정 머리에 작은 검정 백팩을 멨다.",
           "clothingPreferences": "밝은 후드티와 운동화, 바람막이를 즐겨 입는다.",
           "foodPreferences": "제육덮밥과 아이스 아메리카노를 좋아한다.",
@@ -500,6 +520,10 @@
             "동아리 첫 전시의 시안과 공개 장비 사용 안내를 정리한다.",
             "기술을 알려주면서도 다른 사람의 작업을 자기 방식으로 바꾸지 않는다."
           ],
+          "reactionProfile": {
+            "baseSpeed": 8,
+            "talkativeness": 30
+          },
           "baseAppearance": "옆머리를 짧게 다듬고 가는 검정 안경을 썼다. 손에 필름 케이스를 돌리는 버릇이 있다.",
           "clothingPreferences": "무채색 셔츠와 편한 작업 바지를 선호한다.",
           "foodPreferences": "쓴 커피와 따뜻한 카레를 좋아한다.",
@@ -536,6 +560,10 @@
             "신입 합주 모임에서 연주 가능한 곡을 고른다.",
             "후배가 과제와 취미 중 무엇을 우선할지 스스로 정하게 한다."
           ],
+          "reactionProfile": {
+            "baseSpeed": 14,
+            "talkativeness": 70
+          },
           "baseAppearance": "목 뒤에서 머리를 짧게 묶고 귀에 작은 링 귀걸이를 했다.",
           "clothingPreferences": "티셔츠와 활동적인 바지, 얇은 재킷을 선호한다.",
           "foodPreferences": "따뜻한 차와 비빔국수, 푸딩을 좋아한다.",
@@ -572,6 +600,10 @@
             "과제 질문을 받으면 공개 안내 범위 안에서 조건을 명확히 한다.",
             "각 조가 작은 범위의 주제를 자기 방식으로 수행하도록 돕는다."
           ],
+          "reactionProfile": {
+            "baseSpeed": 9,
+            "talkativeness": 35
+          },
           "baseAppearance": "턱선 길이의 머리에 가는 테 안경을 썼다.",
           "clothingPreferences": "움직이기 편한 셔츠와 재킷, 낮은 구두를 선호한다.",
           "foodPreferences": "따뜻한 녹차와 김밥을 좋아한다.",
@@ -608,6 +640,10 @@
             "녹음기 사용 전 상태와 공용 장비 사용 절차를 안내한다.",
             "실습실을 필요한 사람들이 공평하게 쓰도록 정리한다."
           ],
+          "reactionProfile": {
+            "baseSpeed": 9,
+            "talkativeness": 30
+          },
           "baseAppearance": "짧은 머리에 목에 실습실 열쇠 스트랩을 걸었다.",
           "clothingPreferences": "무난한 셔츠와 청바지, 실내 운동화를 주로 입는다.",
           "foodPreferences": "따뜻한 아메리카노와 돈가스를 좋아한다.",
@@ -644,6 +680,10 @@
             "가게 주문과 마감 준비를 처리한다.",
             "임수아와 합의한 근무 일정을 지키고 학생들의 과제 모임이 다른 손님을 방해하지 않도록 안내한다."
           ],
+          "reactionProfile": {
+            "baseSpeed": 10,
+            "talkativeness": 50
+          },
           "baseAppearance": "단정한 짧은 머리에 소매를 팔꿈치까지 걷었다.",
           "clothingPreferences": "편한 셔츠와 면바지 위에 가게 앞치마를 입는다.",
           "foodPreferences": "에스프레소와 짭짤한 치즈 토스트를 좋아한다.",
@@ -2091,6 +2131,7 @@
           "companion": false,
           "appearance": "쇄골에 닿는 짙은 갈색 생머리에 가는 은색 귀걸이를 했다. 눈을 맞출 때는 반듯하지만 생각할 때는 손에 든 펜을 내려다본다. 아이보리 셔츠 위에 남색 얇은 니트를 입고 베이지 와이드 팬츠와 흰 운동화를 신었다. 작은 녹음기를 넣은 크로스백을 멨다.",
           "playerContext": "첫 교양 수업에서 같은 3조가 된 만 19세 신입생이다. 과제 설명에서 질문을 한 학생으로 기억하고 있다. 출석표로 서로의 이름은 확인했지만, 플레이어의 이름은 아직 플레이 중에 직접 소개할 수 있다. 플레이어가 만 21세 군복학 1학년이라는 것은 조 배정 때 들었다. 사적으로 만난 적이나 사귀기로 한 약속은 없다.",
+          "arousal": 25,
           "state": {},
           "relationships": {
             "player": {
@@ -2148,6 +2189,7 @@
           "companion": false,
           "appearance": "어깨를 넘는 검은 웨이브 머리를 한쪽 귀 뒤로 넘겼다. 눈꼬리가 길고 손톱에는 옅은 복숭아색을 발랐다. 검정 골지 긴팔 상의 위에 짧은 데님 재킷을 걸치고 흰 와이드 팬츠와 검정 스니커즈를 신었다. 캔버스 가방 손잡이에 작은 키링이 달렸다.",
           "playerContext": "첫 교양 수업에서 같은 3조가 된 만 19세 신입생이다. 수업에서 스케치북을 펼쳐두던 디자인과 학생이다. 출석표로 서로의 이름은 확인했지만, 플레이어의 이름은 아직 플레이 중에 직접 소개할 수 있다. 플레이어가 만 21세 군복학 1학년이라는 것은 조 배정 때 들었다. 사적으로 만난 적이나 사귀기로 한 약속은 없다.",
+          "arousal": 20,
           "state": {},
           "relationships": {
             "player": {
@@ -2205,6 +2247,7 @@
           "companion": false,
           "appearance": "턱 아래까지 오는 검정 단발에 얇은 둥근 안경을 썼다. 표정이 크지 않지만 재미있으면 입가부터 웃는다. 회색 티셔츠에 크림색 오버셔츠를 걸치고 검정 면바지와 회색 운동화를 신었다. 노트북 파우치를 들었다.",
           "playerContext": "첫 교양 수업에서 같은 3조가 된 만 19세 신입생이다. 노트북으로 수업 자료를 정리하던 학생이다. 출석표로 서로의 이름은 확인했지만, 플레이어의 이름은 아직 플레이 중에 직접 소개할 수 있다. 플레이어가 만 21세 군복학 1학년이라는 것은 조 배정 때 들었다. 사적으로 만난 적이나 사귀기로 한 약속은 없다.",
+          "arousal": 15,
           "state": {},
           "relationships": {
             "player": {
@@ -2262,6 +2305,7 @@
           "companion": false,
           "appearance": "따뜻한 갈색 머리를 낮은 포니테일로 묶었다. 웃을 때 한쪽 볼에 얕은 보조개가 생기고 손목에 작은 전자시계를 찼다. 얇은 연두색 카디건 안에 흰 면 티셔츠를 입고 진청 스트레이트 데님과 흰 운동화를 신었다. 가벼운 백팩을 멨다.",
           "playerContext": "첫 교양 수업에서 같은 3조가 된 만 19세 신입생이다. 함께 출구 쪽에 앉았고 과제 모임 시간을 묻기 위해 아직 자리를 떠나지 않았다. 출석표로 서로의 이름은 확인했지만, 플레이어의 이름은 아직 플레이 중에 직접 소개할 수 있다. 플레이어가 만 21세 군복학 1학년이라는 것은 조 배정 때 들었다. 사적으로 만난 적이나 사귀기로 한 약속은 없다.",
+          "arousal": 15,
           "state": {},
           "relationships": {
             "player": {
@@ -2319,6 +2363,7 @@
           "companion": false,
           "appearance": "짧게 손질한 검정 머리에 작은 검정 백팩을 멨다. 하늘색 후드티와 청바지, 검정 운동화를 신었다.",
           "playerContext": "다른 조의 같은 학년 학생이다. 출석 때 이름을 들었을 뿐, 플레이어와 따로 대화한 적은 없다.",
+          "arousal": 20,
           "state": {},
           "relationships": {
             "seo-rin": {
@@ -2349,6 +2394,7 @@
           "companion": false,
           "appearance": "옆머리를 짧게 다듬고 가는 검정 안경을 썼다. 손에 필름 케이스를 돌리는 버릇이 있다. 짙은 회색 셔츠와 검정 작업 바지에 운동화를 신었다.",
           "playerContext": "사진연구회 작업실에서 만날 수 있는 3학년 선배다. 플레이어와의 사적인 친분은 없다.",
+          "arousal": 10,
           "state": {},
           "relationships": {
             "ji-yu": {
@@ -2379,6 +2425,7 @@
           "companion": false,
           "appearance": "목 뒤에서 머리를 짧게 묶고 귀에 작은 링 귀걸이를 했다. 흰 티셔츠와 검정 조거팬츠에 가벼운 운동화를 신었다.",
           "playerContext": "합주 모임을 운영하는 선배다. 플레이어와는 처음 만나는 사이며, 자동으로 연애 상담이나 안내를 맡은 사람은 아니다.",
+          "arousal": 20,
           "state": {},
           "relationships": {
             "da-in": {
@@ -2409,6 +2456,7 @@
           "companion": false,
           "appearance": "턱선 길이의 머리에 가는 테 안경을 썼다. 베이지 재킷과 흰 셔츠에 검정 슬랙스를 입었다.",
           "playerContext": "첫 교양 수업의 담당 교수다. 출석 확인에서 플레이어가 군휴학 뒤 첫 학기 수업을 시작한다고 들었고, 별도의 사적인 친분은 없다.",
+          "arousal": 10,
           "state": {},
           "relationships": {
             "player": {
@@ -2430,6 +2478,7 @@
           "companion": false,
           "appearance": "짧은 머리에 목에 실습실 열쇠 스트랩을 걸었다. 회색 셔츠와 진청 데님에 운동화를 신었다.",
           "playerContext": "미디어 실습실의 조교다. 플레이어와는 처음 만난다. 공용 장비의 위치와 사용법을 물어볼 수 있다.",
+          "arousal": 10,
           "state": {},
           "relationships": {
             "player": {
@@ -2451,6 +2500,7 @@
           "companion": false,
           "appearance": "단정한 짧은 머리에 소매를 팔꿈치까지 걷었다. 흰 셔츠와 짙은 면바지 위에 남색 앞치마를 둘렀다.",
           "playerContext": "학교 카페 점주다. 플레이어는 처음 찾는 손님이며 점주가 이전부터 알아보는 단골은 아니다.",
+          "arousal": 10,
           "state": {},
           "relationships": {
             "su-a": {
@@ -2824,6 +2874,8 @@
       "minute": 1080,
       "activeSceneId": "seminar-room",
       "events": [],
+      "reactionClock": 0,
+      "reactionSequence": 0,
       "instances": [
         {
           "id": "seo-rin",
@@ -2833,6 +2885,7 @@
           "companion": false,
           "appearance": "쇄골에 닿는 짙은 갈색 생머리에 가는 은색 귀걸이를 했다. 눈을 맞출 때는 반듯하지만 생각할 때는 손에 든 펜을 내려다본다. 아이보리 셔츠 위에 남색 얇은 니트를 입고 베이지 와이드 팬츠와 흰 운동화를 신었다. 작은 녹음기를 넣은 크로스백을 멨다.",
           "playerContext": "첫 교양 수업에서 같은 3조가 된 만 19세 신입생이다. 과제 설명에서 질문을 한 학생으로 기억하고 있다. 출석표로 서로의 이름은 확인했지만, 플레이어의 이름은 아직 플레이 중에 직접 소개할 수 있다. 플레이어가 만 21세 군복학 1학년이라는 것은 조 배정 때 들었다. 사적으로 만난 적이나 사귀기로 한 약속은 없다.",
+          "arousal": 25,
           "state": {
             "age": 19,
             "department": "미디어커뮤니케이션학과",
@@ -2891,7 +2944,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "ji-yu",
@@ -2901,6 +2957,7 @@
           "companion": false,
           "appearance": "어깨를 넘는 검은 웨이브 머리를 한쪽 귀 뒤로 넘겼다. 눈꼬리가 길고 손톱에는 옅은 복숭아색을 발랐다. 검정 골지 긴팔 상의 위에 짧은 데님 재킷을 걸치고 흰 와이드 팬츠와 검정 스니커즈를 신었다. 캔버스 가방 손잡이에 작은 키링이 달렸다.",
           "playerContext": "첫 교양 수업에서 같은 3조가 된 만 19세 신입생이다. 수업에서 스케치북을 펼쳐두던 디자인과 학생이다. 출석표로 서로의 이름은 확인했지만, 플레이어의 이름은 아직 플레이 중에 직접 소개할 수 있다. 플레이어가 만 21세 군복학 1학년이라는 것은 조 배정 때 들었다. 사적으로 만난 적이나 사귀기로 한 약속은 없다.",
+          "arousal": 20,
           "state": {
             "age": 19,
             "department": "시각디자인학과",
@@ -2959,7 +3016,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "da-in",
@@ -2969,6 +3029,7 @@
           "companion": false,
           "appearance": "턱 아래까지 오는 검정 단발에 얇은 둥근 안경을 썼다. 표정이 크지 않지만 재미있으면 입가부터 웃는다. 회색 티셔츠에 크림색 오버셔츠를 걸치고 검정 면바지와 회색 운동화를 신었다. 노트북 파우치를 들었다.",
           "playerContext": "첫 교양 수업에서 같은 3조가 된 만 19세 신입생이다. 노트북으로 수업 자료를 정리하던 학생이다. 출석표로 서로의 이름은 확인했지만, 플레이어의 이름은 아직 플레이 중에 직접 소개할 수 있다. 플레이어가 만 21세 군복학 1학년이라는 것은 조 배정 때 들었다. 사적으로 만난 적이나 사귀기로 한 약속은 없다.",
+          "arousal": 15,
           "state": {
             "age": 19,
             "department": "컴퓨터공학과",
@@ -3027,7 +3088,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "su-a",
@@ -3037,6 +3101,7 @@
           "companion": false,
           "appearance": "따뜻한 갈색 머리를 낮은 포니테일로 묶었다. 웃을 때 한쪽 볼에 얕은 보조개가 생기고 손목에 작은 전자시계를 찼다. 얇은 연두색 카디건 안에 흰 면 티셔츠를 입고 진청 스트레이트 데님과 흰 운동화를 신었다. 가벼운 백팩을 멨다.",
           "playerContext": "첫 교양 수업에서 같은 3조가 된 만 19세 신입생이다. 함께 출구 쪽에 앉았고 과제 모임 시간을 묻기 위해 아직 자리를 떠나지 않았다. 출석표로 서로의 이름은 확인했지만, 플레이어의 이름은 아직 플레이 중에 직접 소개할 수 있다. 플레이어가 만 21세 군복학 1학년이라는 것은 조 배정 때 들었다. 사적으로 만난 적이나 사귀기로 한 약속은 없다.",
+          "arousal": 15,
           "state": {
             "age": 19,
             "department": "경영학과",
@@ -3097,7 +3162,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "do-gyeom",
@@ -3107,6 +3175,7 @@
           "companion": false,
           "appearance": "짧게 손질한 검정 머리에 작은 검정 백팩을 멨다. 하늘색 후드티와 청바지, 검정 운동화를 신었다.",
           "playerContext": "다른 조의 같은 학년 학생이다. 출석 때 이름을 들었을 뿐, 플레이어와 따로 대화한 적은 없다.",
+          "arousal": 20,
           "state": {
             "age": 19,
             "year": 1,
@@ -3136,7 +3205,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "tae-jun",
@@ -3146,6 +3218,7 @@
           "companion": false,
           "appearance": "옆머리를 짧게 다듬고 가는 검정 안경을 썼다. 손에 필름 케이스를 돌리는 버릇이 있다. 짙은 회색 셔츠와 검정 작업 바지에 운동화를 신었다.",
           "playerContext": "사진연구회 작업실에서 만날 수 있는 3학년 선배다. 플레이어와의 사적인 친분은 없다.",
+          "arousal": 10,
           "state": {
             "age": 22,
             "year": 3,
@@ -3175,7 +3248,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "hye-won",
@@ -3185,6 +3261,7 @@
           "companion": false,
           "appearance": "목 뒤에서 머리를 짧게 묶고 귀에 작은 링 귀걸이를 했다. 흰 티셔츠와 검정 조거팬츠에 가벼운 운동화를 신었다.",
           "playerContext": "합주 모임을 운영하는 선배다. 플레이어와는 처음 만나는 사이며, 자동으로 연애 상담이나 안내를 맡은 사람은 아니다.",
+          "arousal": 20,
           "state": {
             "age": 22,
             "year": 3,
@@ -3214,7 +3291,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "eun-jae",
@@ -3224,6 +3304,7 @@
           "companion": false,
           "appearance": "턱선 길이의 머리에 가는 테 안경을 썼다. 베이지 재킷과 흰 셔츠에 검정 슬랙스를 입었다.",
           "playerContext": "첫 교양 수업의 담당 교수다. 출석 확인에서 플레이어가 군휴학 뒤 첫 학기 수업을 시작한다고 들었고, 별도의 사적인 친분은 없다.",
+          "arousal": 10,
           "state": {
             "age": 38,
             "role": "교양 담당 교수",
@@ -3244,7 +3325,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "min-seok",
@@ -3254,6 +3338,7 @@
           "companion": false,
           "appearance": "짧은 머리에 목에 실습실 열쇠 스트랩을 걸었다. 회색 셔츠와 진청 데님에 운동화를 신었다.",
           "playerContext": "미디어 실습실의 조교다. 플레이어와는 처음 만난다. 공용 장비의 위치와 사용법을 물어볼 수 있다.",
+          "arousal": 10,
           "state": {
             "age": 25,
             "role": "실습 조교",
@@ -3274,7 +3359,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "do-yun",
@@ -3284,6 +3372,7 @@
           "companion": false,
           "appearance": "단정한 짧은 머리에 소매를 팔꿈치까지 걷었다. 흰 셔츠와 짙은 면바지 위에 남색 앞치마를 둘렀다.",
           "playerContext": "학교 카페 점주다. 플레이어는 처음 찾는 손님이며 점주가 이전부터 알아보는 단골은 아니다.",
+          "arousal": 10,
           "state": {
             "age": 29,
             "role": "카페 점주",
@@ -3313,7 +3402,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "assignment-screen",

@@ -428,6 +428,10 @@
             "전학생이 원하는 첫 장소까지 길을 안내한다",
             "18시 30분 전에 다은에게 인쇄한 준비표를 건네고 자기 시간을 확보한다"
           ],
+          "reactionProfile": {
+            "baseSpeed": 14,
+            "talkativeness": 70
+          },
           "baseAppearance": "턱 아래로 내려오는 단정한 단발에 노란 실핀을 꽂았다.",
           "clothingPreferences": "밝은 색 니트와 움직이기 편한 운동화를 좋아한다. 학교에서는 교복 위에 얇은 가디건을 걸친다.",
           "foodPreferences": "달걀 샌드위치와 귤을 좋아하고 지나치게 쓴 음료는 잘 고르지 않는다.",
@@ -471,6 +475,10 @@
             "오늘 안에 반 부스의 역할 두 자리를 자발적인 지원으로 채운다",
             "서우의 친절을 당연하게 쓰지 않고 자기 부담도 나눈다"
           ],
+          "reactionProfile": {
+            "baseSpeed": 12,
+            "talkativeness": 45
+          },
           "baseAppearance": "어깨에 닿는 머리를 낮게 묶고 검은 사각 시계를 찼다.",
           "clothingPreferences": "단정한 교복과 주머니가 있는 겉옷을 선호한다. 꾸밈보다 정리와 편의를 중시한다.",
           "foodPreferences": "따뜻한 보리차와 김밥을 즐기며 손에 많이 묻는 간식은 서류 정리 중에는 피한다.",
@@ -513,6 +521,10 @@
             "손잡이가 느슨한 축제 손종의 점검 내용을 박정우에게 보고한다",
             "장하람이 직접 설명할 시간을 빼앗지 않는다"
           ],
+          "reactionProfile": {
+            "baseSpeed": 8,
+            "talkativeness": 25
+          },
           "baseAppearance": "짧은 머리와 얇은 금속테 안경이 눈에 띈다.",
           "clothingPreferences": "소매가 걸리지 않는 옷과 튼튼한 운동화를 고른다. 장식이 많은 옷은 작업할 때 피한다.",
           "foodPreferences": "참치 주먹밥과 우유를 좋아한다. 진한 계피 향은 선호하지 않는다.",
@@ -555,6 +567,10 @@
             "동의를 받은 사진 다섯 장을 전시 후보로 고른다",
             "홍예린에게 공개할 사진의 범위를 명확히 전달한다"
           ],
+          "reactionProfile": {
+            "baseSpeed": 9,
+            "talkativeness": 40
+          },
           "baseAppearance": "곧은 검은 머리를 귀 뒤로 넘기고 동그란 안경을 썼다.",
           "clothingPreferences": "무채색 옷과 가벼운 운동화를 즐겨 입는다. 눈에 띄는 로고는 피한다.",
           "foodPreferences": "아이스 레몬차와 소금 크래커를 좋아한다. 단맛이 강한 크림은 조금만 먹는다.",
@@ -597,6 +613,10 @@
             "미리듣기 출력을 헤드폰과 복도 중 어디로 내보낼지 확인한다",
             "어제의 출력 실수를 박정우에게 자기 말로 설명한다"
           ],
+          "reactionProfile": {
+            "baseSpeed": 14,
+            "talkativeness": 70
+          },
           "baseAppearance": "약간 흐트러진 짧은 머리에 웃을 때 한쪽 볼에 보조개가 생긴다.",
           "clothingPreferences": "편한 집업과 운동화를 선호한다. 공식 행사에서는 셔츠 차림도 맞춘다.",
           "foodPreferences": "매콤한 떡볶이와 복숭아 음료를 좋아한다. 생강 향이 강한 차는 잘 찾지 않는다.",
@@ -639,6 +659,10 @@
             "강당과 체육관의 사용 시간 충돌을 당사자들과 조율한다",
             "초록 파일의 미전달 서류를 확인하고 책임질 부분을 말한다"
           ],
+          "reactionProfile": {
+            "baseSpeed": 12,
+            "talkativeness": 60
+          },
           "baseAppearance": "짧은 머리를 옆으로 정리했고 가는 테 안경을 썼다.",
           "clothingPreferences": "차분한 색과 구김 적은 옷을 선호한다. 교내 일정에서는 교복 재킷을 자주 입는다.",
           "foodPreferences": "따뜻한 유자차와 담백한 빵을 좋아한다. 너무 매운 국물은 피하는 편이다.",
@@ -681,6 +705,10 @@
             "오늘은 후렴 한 구간만 민재와 실제로 맞춘다",
             "수아에게 필요한 무대 색을 구체적으로 설명한다"
           ],
+          "reactionProfile": {
+            "baseSpeed": 16,
+            "talkativeness": 80
+          },
           "baseAppearance": "어깨 길이 머리 끝이 살짝 뻗쳐 있고 초록색 머리끈을 손목에 걸었다.",
           "clothingPreferences": "활동하기 편한 체크 셔츠와 캔버스화를 좋아한다. 무대에서는 소매와 장식이 연주에 걸리지 않게 한다.",
           "foodPreferences": "토마토 파스타와 탄산수를 좋아한다. 노래할 때는 차가운 음료를 잠깐 미루기도 한다.",
@@ -723,6 +751,10 @@
             "하린에게 오늘 가능한 합주 시간을 정확히 말한다",
             "공용 케이블을 정리한 뒤 집에 갈 준비를 한다"
           ],
+          "reactionProfile": {
+            "baseSpeed": 8,
+            "talkativeness": 30
+          },
           "baseAppearance": "짧게 자른 머리에 눈썹 한쪽이 조금 치켜올라 있다.",
           "clothingPreferences": "팔을 움직이기 편한 옷과 가벼운 신발을 선호한다.",
           "foodPreferences": "간장 볶음밥과 따뜻한 물을 좋아하며 지나치게 단 음료는 잘 마시지 않는다.",
@@ -765,6 +797,10 @@
             "남은 판넬로 안내 피켓 두 종류를 비교한다",
             "보라와 체육관 입구 표지의 크기를 합의한다"
           ],
+          "reactionProfile": {
+            "baseSpeed": 9,
+            "talkativeness": 40
+          },
           "baseAppearance": "앞머리가 눈썹 위에 닿고 긴 머리를 느슨하게 묶었다.",
           "clothingPreferences": "오래 입은 옷을 손질해 입고 흙색과 청색을 좋아한다.",
           "foodPreferences": "고구마와 따뜻한 우유를 좋아한다. 손이 바쁠 때 부스러기 많은 과자는 피한다.",
@@ -807,6 +843,10 @@
             "반 부스 대본의 첫 장면을 실제로 읽어보고 다은에게 제출한다",
             "해솔에게 자신의 시가 아니라 해솔의 글을 읽고 싶다고 전한다"
           ],
+          "reactionProfile": {
+            "baseSpeed": 7,
+            "talkativeness": 20
+          },
           "baseAppearance": "귀를 덮는 머리를 가볍게 정리했고 얇은 둥근 안경을 썼다.",
           "clothingPreferences": "부드러운 니트와 소리가 적게 나는 신발을 좋아한다.",
           "foodPreferences": "팥빵과 따뜻한 보리차를 즐긴다. 민트 향 과자는 잘 고르지 않는다.",
@@ -849,6 +889,10 @@
             "손종 실종이라는 제목을 쓰기 전에 이동 기록을 확인한다",
             "지수와 공개 사진 범위, 미정과 인용 출처를 합의한다"
           ],
+          "reactionProfile": {
+            "baseSpeed": 18,
+            "talkativeness": 85
+          },
           "baseAppearance": "턱선 길이의 머리를 귀 뒤로 넘기고 작은 은색 머리핀을 꽂았다.",
           "clothingPreferences": "밝은 셔츠와 튼튼한 운동화를 좋아한다. 이동 많은 날에는 가벼운 겉옷을 고른다.",
           "foodPreferences": "사과와 치즈 토스트를 좋아한다. 지나치게 쓴 커피 맛은 피한다.",
@@ -891,6 +935,10 @@
             "축제 안내 음성의 크기를 비교할 간단한 측정 계획을 세운다",
             "서우에게 미뤄진 약속이 신경 쓰였다고 직접 말한다"
           ],
+          "reactionProfile": {
+            "baseSpeed": 10,
+            "talkativeness": 35
+          },
           "baseAppearance": "짧고 반듯한 머리에 검은 뿔테 안경을 썼다.",
           "clothingPreferences": "주머니 있는 단정한 옷과 미끄럽지 않은 신발을 선호한다.",
           "foodPreferences": "담백한 국수와 배를 좋아한다. 강한 훈연 향은 선호하지 않는다.",
@@ -933,6 +981,10 @@
             "자신이 만든 동선 모형을 자기 말로 설명한다",
             "윤태성과 함께 옮긴 공용 물품의 기록 누락을 확인한다"
           ],
+          "reactionProfile": {
+            "baseSpeed": 15,
+            "talkativeness": 70
+          },
           "baseAppearance": "짧은 머리 윗부분이 조금 솟아 있고 눈을 맞추면 금세 표정이 달라진다.",
           "clothingPreferences": "밝은 색 운동화와 편한 집업을 좋아한다. 작업 중에는 끈과 소매를 정리한다.",
           "foodPreferences": "카레밥과 바나나를 좋아한다. 아주 신 사탕은 한두 개면 충분하다.",
@@ -975,6 +1027,10 @@
             "온실 안내 문구를 관람객이 이해할 말로 바꿔본다",
             "수아에게 재사용할 수 있는 이름표 판넬을 부탁한다"
           ],
+          "reactionProfile": {
+            "baseSpeed": 6,
+            "talkativeness": 20
+          },
           "baseAppearance": "긴 머리를 하나로 땋고 작은 초록 머리끈으로 묶었다.",
           "clothingPreferences": "차분한 초록색과 세탁하기 쉬운 겉옷을 좋아한다.",
           "foodPreferences": "오이 샌드위치와 따뜻한 옥수수차를 좋아한다. 자극적인 매운맛은 선호하지 않는다.",
@@ -1017,6 +1073,10 @@
             "무리하지 않고 준비 운동과 정리를 마친다",
             "보라에게 축제 지원은 가능한 시간만 약속한다"
           ],
+          "reactionProfile": {
+            "baseSpeed": 9,
+            "talkativeness": 40
+          },
           "baseAppearance": "짧은 머리와 곧은 자세가 눈에 띈다.",
           "clothingPreferences": "통풍되는 운동복과 발에 익은 러닝화를 선호한다.",
           "foodPreferences": "바나나와 따뜻한 국밥을 좋아한다. 운동 직전 기름진 간식은 미룬다.",
@@ -1059,6 +1119,10 @@
             "강당·체육관 공용 동선을 당사자들과 조정한다",
             "물품 누락을 확인하고도 성급하게 범인을 만드는 공지를 막는다"
           ],
+          "reactionProfile": {
+            "baseSpeed": 12,
+            "talkativeness": 55
+          },
           "baseAppearance": "긴 머리를 단정히 묶고 가는 은색 안경을 썼다.",
           "clothingPreferences": "단정한 재킷과 차분한 색을 좋아하지만 휴일에는 편한 니트를 입는다.",
           "foodPreferences": "따뜻한 우롱차와 밤빵을 좋아한다. 너무 단 크림 음료는 잘 찾지 않는다.",
@@ -1101,6 +1165,10 @@
             "체육관 시범과 다른 부스가 함께 쓸 시간을 합의한다",
             "입구 안내 멘트를 짧게라도 자기 목소리로 연습한다"
           ],
+          "reactionProfile": {
+            "baseSpeed": 16,
+            "talkativeness": 80
+          },
           "baseAppearance": "짧게 묶은 머리에 남색 스포츠 머리띠를 했다.",
           "clothingPreferences": "움직임이 편한 운동복과 쿠션 있는 신발을 선호한다.",
           "foodPreferences": "치킨 덮밥과 사과 주스를 좋아한다. 운동 전에는 과식을 피한다.",
@@ -1143,6 +1211,10 @@
             "학교에서 허용한 포장 간식 메뉴의 설명 카드를 정리한다",
             "순자에게 색지 가격과 가능한 수량을 먼저 묻는다"
           ],
+          "reactionProfile": {
+            "baseSpeed": 9,
+            "talkativeness": 50
+          },
           "baseAppearance": "부드럽게 굽은 짧은 머리에 둥근 테 안경을 썼다.",
           "clothingPreferences": "밝은 색 셔츠와 편한 바지를 좋아하며 음식 작업 때 깨끗한 앞치마를 챙긴다.",
           "foodPreferences": "산미 있는 토마토 음식과 바삭한 전을 좋아한다. 무조건 달기만 한 맛은 아쉽다고 느낀다.",
@@ -1185,6 +1257,10 @@
             "보건실 안내와 물품 정리를 마친 뒤 자기 준비 시간을 지킨다",
             "동의 없이 친구의 건강 사정을 공유하지 않는다"
           ],
+          "reactionProfile": {
+            "baseSpeed": 8,
+            "talkativeness": 40
+          },
           "baseAppearance": "어깨에 닿는 머리를 반묶음하고 하늘색 머리핀을 꽂았다.",
           "clothingPreferences": "부드러운 가디건과 오래 서 있어도 편한 신발을 좋아한다.",
           "foodPreferences": "단호박 수프와 따뜻한 차를 좋아한다. 강한 향의 사탕은 선호하지 않는다.",
@@ -1227,6 +1303,10 @@
             "가을제 전시 책을 세 권 골라 이유를 적는다",
             "임세진에게 보여줄 글의 범위를 자기 의사로 정한다"
           ],
+          "reactionProfile": {
+            "baseSpeed": 7,
+            "talkativeness": 25
+          },
           "baseAppearance": "앞머리를 가지런히 정리하고 검은 둥근 안경을 썼다.",
           "clothingPreferences": "조용한 색의 니트와 가벼운 단화를 선호한다.",
           "foodPreferences": "배와 치즈빵을 좋아한다. 탄산이 센 음료는 잘 고르지 않는다.",
@@ -1269,6 +1349,10 @@
             "공용 장비의 실제 위치와 담당자를 대조한다",
             "태성의 점검 보고와 도현의 학생회 전달 여부를 확인한다"
           ],
+          "reactionProfile": {
+            "baseSpeed": 9,
+            "talkativeness": 35
+          },
           "baseAppearance": "짧은 머리 옆에 흰머리가 조금 섞였고 검은 테 안경을 썼다.",
           "clothingPreferences": "작업할 때 튼튼한 면 셔츠와 주머니 있는 조끼를 선호한다.",
           "foodPreferences": "따뜻한 된장국과 보리차를 좋아한다. 아주 단 간식은 조금만 먹는다.",
@@ -1311,6 +1395,10 @@
             "전학생이 학교 동선과 선택 가능한 활동을 알도록 돕는다",
             "다은이 반 업무를 혼자 떠맡지 않도록 실제 분담을 확인한다"
           ],
+          "reactionProfile": {
+            "baseSpeed": 8,
+            "talkativeness": 35
+          },
           "baseAppearance": "단정한 단발과 얇은 갈색 테 안경이 눈에 띈다.",
           "clothingPreferences": "차분한 가디건과 오래 서 있을 수 있는 단화를 좋아한다.",
           "foodPreferences": "따뜻한 현미차와 담백한 쌀과자를 즐긴다. 짠 간식은 적게 먹는 편이다.",
@@ -1353,6 +1441,10 @@
             "가을제 공개 자료 전시의 출처를 정리한다",
             "해솔과 예린이 공개 범위를 스스로 이해하도록 돕는다"
           ],
+          "reactionProfile": {
+            "baseSpeed": 6,
+            "talkativeness": 25
+          },
           "baseAppearance": "귀 아래로 내려오는 머리를 단정히 빗고 작은 둥근 안경을 썼다.",
           "clothingPreferences": "조용히 움직일 수 있는 단화와 가벼운 가디건을 선호한다.",
           "foodPreferences": "따뜻한 루이보스차와 배를 좋아한다. 자료 정리 중에는 음식물을 따로 둔다.",
@@ -1395,6 +1487,10 @@
             "늦게까지 준비하는 학생들이 필요한 휴식을 선택할 수 있게 한다",
             "소민이 맡을 수 있는 일과 교사가 맡아야 할 일을 구분한다"
           ],
+          "reactionProfile": {
+            "baseSpeed": 10,
+            "talkativeness": 30
+          },
           "baseAppearance": "짧은 머리를 반듯하게 정리했고 얇은 금속테 안경을 썼다.",
           "clothingPreferences": "깨끗하고 활동하기 편한 셔츠와 가벼운 신발을 고른다.",
           "foodPreferences": "따뜻한 차와 담백한 국수를 좋아한다. 근무 중에는 향이 강한 음식을 미룬다.",
@@ -1437,6 +1533,10 @@
             "가게에서 내일 주문 수량과 색지 재고를 정리한다",
             "찾아온 손님에게 필요한 크기와 수량을 확인한다"
           ],
+          "reactionProfile": {
+            "baseSpeed": 11,
+            "talkativeness": 65
+          },
           "baseAppearance": "짧은 곱슬머리에 은빛 머리카락이 섞였고 갈색 테 안경을 썼다.",
           "clothingPreferences": "주머니 많은 앞치마와 편한 운동화를 좋아한다. 쌀쌀하면 두툼한 조끼를 걸친다.",
           "foodPreferences": "따뜻한 보리차와 밤을 좋아한다. 너무 끈적한 사탕은 선호하지 않는다.",
@@ -3254,6 +3354,7 @@
           "companion": true,
           "appearance": "턱 아래로 내려오는 단정한 단발에 노란 실핀을 꽂았다. 흰 셔츠와 회색 교복 조끼 위에 연노랑 가디건을 걸치고 검은 운동화를 신었다.",
           "playerContext": "이서우는 원래 솔빛고에 다니던 2학년 3반 학생이다. 나는 오늘 이 반으로 전학 왔고, 서우는 내 학교 안내를 맡아 정문에서 만나기로 했다. 우리는 오늘 처음 알게 된 사이이다.",
+          "arousal": 20,
           "state": {},
           "relationships": {
             "dan-eun": {
@@ -3302,6 +3403,7 @@
           "companion": false,
           "appearance": "어깨에 닿는 머리를 낮게 묶고 검은 사각 시계를 찼다. 회색 교복 재킷과 흰 셔츠를 단정히 입고 검은 로퍼를 신었다.",
           "playerContext": "강다은은 솔빛고 2학년 3반의 기존 재학생이자 반장이다. 나는 오늘 이 반으로 전학 와서 반장으로 소개받았다. 아직 개인적으로 가까워진 사이는 아니다.",
+          "arousal": 25,
           "state": {},
           "relationships": {
             "seo-woo": {
@@ -3341,6 +3443,7 @@
           "companion": false,
           "appearance": "짧은 머리와 얇은 금속테 안경이 눈에 띈다. 회색 교복 조끼와 소매를 정리한 흰 셔츠에 검은 운동화를 신었다.",
           "playerContext": "교내 메이커 동아리에서 수리를 맡는 2학년이다. 시작 시점에는 나와 개인적인 친분이 없다.",
+          "arousal": 20,
           "state": {},
           "relationships": {
             "ha-ram": {
@@ -3380,6 +3483,7 @@
           "companion": false,
           "appearance": "곧은 검은 머리를 귀 뒤로 넘기고 동그란 안경을 썼다. 흰 셔츠와 회색 교복 조끼에 검은 캔버스화를 신었다.",
           "playerContext": "사진 동아리의 2학년 학생이다. 나와는 아직 개인적인 추억이 없는 사이이며 촬영 동의를 따로 확인해야 한다.",
+          "arousal": 10,
           "state": {},
           "relationships": {
             "seo-woo": {
@@ -3419,6 +3523,7 @@
           "companion": false,
           "appearance": "약간 흐트러진 짧은 머리에 웃을 때 한쪽 볼에 보조개가 생긴다. 흰 셔츠와 회색 교복 조끼에 남색 집업을 걸쳤다.",
           "playerContext": "방송부에서 음향을 맡는 2학년이다. 시작 시점에는 나와 사적으로 알던 사이가 아니다.",
+          "arousal": 30,
           "state": {},
           "relationships": {
             "ji-su": {
@@ -3458,6 +3563,7 @@
           "companion": false,
           "appearance": "짧은 머리를 옆으로 정리했고 가는 테 안경을 썼다. 교복 재킷과 흰 셔츠를 입고 검은 로퍼를 신었다.",
           "playerContext": "학생회 부회장인 2학년 학생이다. 나에게는 아직 공식 역할로만 알려진 사람이며 개인적 친분은 없다.",
+          "arousal": 20,
           "state": {},
           "relationships": {
             "dan-eun": {
@@ -3497,6 +3603,7 @@
           "companion": false,
           "appearance": "어깨 길이 머리 끝이 살짝 뻗쳐 있고 초록색 머리끈을 손목에 걸었다. 흰 셔츠와 회색 교복 조끼에 검은 캔버스화를 신었다.",
           "playerContext": "밴드부에서 기타와 보컬을 맡는 2학년이다. 오늘 전학 온 나와는 아직 개인적인 관계가 없다.",
+          "arousal": 30,
           "state": {},
           "relationships": {
             "min-jae": {
@@ -3527,6 +3634,7 @@
           "companion": false,
           "appearance": "짧게 자른 머리에 눈썹 한쪽이 조금 치켜올라 있다. 흰 셔츠와 회색 교복 조끼에 검은 운동화를 신었다.",
           "playerContext": "밴드부 드럼 담당인 2학년이다. 나와는 시작 시점에 친분이 없고 각자의 귀가 일정도 별개다.",
+          "arousal": 25,
           "state": {},
           "relationships": {
             "geon-u": {
@@ -3557,6 +3665,7 @@
           "companion": false,
           "appearance": "앞머리가 눈썹 위에 닿고 긴 머리를 느슨하게 묶었다. 흰 셔츠와 회색 교복 조끼에 갈색 운동화를 신었다.",
           "playerContext": "미술 동아리에서 가을제 장식을 만드는 2학년이다. 시작 시점에는 나와 개인적으로 만나본 적이 없다.",
+          "arousal": 15,
           "state": {},
           "relationships": {
             "ha-rin": {
@@ -3596,6 +3705,7 @@
           "companion": false,
           "appearance": "귀를 덮는 머리를 가볍게 정리했고 얇은 둥근 안경을 썼다. 회색 교복 조끼 위에 남색 가디건을 걸치고 검은 단화를 신었다.",
           "playerContext": "임세진은 원래 솔빛고 2학년 3반에 다니던 학생이며 문예부에서 글을 쓴다. 나는 오늘 이 반으로 전학 와서 같은 반 학생으로 소개받았다. 아직 가까운 사이는 아니다.",
+          "arousal": 10,
           "state": {},
           "relationships": {
             "hae-sol": {
@@ -3626,6 +3736,7 @@
           "companion": false,
           "appearance": "턱선 길이의 머리를 귀 뒤로 넘기고 작은 은색 머리핀을 꽂았다. 흰 셔츠와 회색 교복 재킷에 흰 운동화를 신었다.",
           "playerContext": "교지 취재를 하는 2학년 학생이다. 나와 아직 친분이 없으며 전학생이라는 이유로 취재에 동의한 상태도 아니다.",
+          "arousal": 25,
           "state": {},
           "relationships": {
             "ji-su": {
@@ -3674,6 +3785,7 @@
           "companion": false,
           "appearance": "짧고 반듯한 머리에 검은 뿔테 안경을 썼다. 흰 셔츠와 회색 교복 조끼에 검은 운동화를 신었다.",
           "playerContext": "과학 동아리에서 실험을 하는 2학년이다. 나와는 아직 개인적인 친분이 없다.",
+          "arousal": 15,
           "state": {},
           "relationships": {
             "seo-woo": {
@@ -3704,6 +3816,7 @@
           "companion": false,
           "appearance": "짧은 머리 윗부분이 조금 솟아 있고 눈을 맞추면 금세 표정이 달라진다. 흰 셔츠와 회색 교복 조끼에 파란 운동화를 신었다.",
           "playerContext": "메이커 동아리의 1학년 후배이다. 시작 시점에는 나와 서로를 잘 모르는 사이이며 친한 선후배로 정해져 있지 않다.",
+          "arousal": 30,
           "state": {},
           "relationships": {
             "tae-seong": {
@@ -3734,6 +3847,7 @@
           "companion": false,
           "appearance": "긴 머리를 하나로 땋고 작은 초록 머리끈으로 묶었다. 흰 셔츠와 회색 교복 조끼 위에 연두색 가디건을 걸쳤다.",
           "playerContext": "온실 일을 돕는 1학년 학생이다. 나와는 아직 개인적 친분이 없고 조용하다는 이유로 동의를 대신할 수 없다.",
+          "arousal": 15,
           "state": {},
           "relationships": {
             "tae-seong": {
@@ -3764,6 +3878,7 @@
           "companion": false,
           "appearance": "짧은 머리와 곧은 자세가 눈에 띈다. 흰 셔츠와 회색 교복 재킷에 검은 운동화를 신었다.",
           "playerContext": "육상부의 3학년 선배이다. 나와는 시작 시점에 사적 친분이 없고 개인적으로 운동을 가르치기로 한 적도 없다.",
+          "arousal": 10,
           "state": {},
           "relationships": {
             "bo-ra": {
@@ -3785,6 +3900,7 @@
           "companion": false,
           "appearance": "긴 머리를 단정히 묶고 가는 은색 안경을 썼다. 회색 교복 재킷과 흰 셔츠에 검은 로퍼를 신었다.",
           "playerContext": "학생회장인 3학년 선배이다. 나에게는 공식 역할로 알려져 있을 뿐 개인적인 친분이나 약속은 없다.",
+          "arousal": 25,
           "state": {},
           "relationships": {
             "do-hyeon": {
@@ -3815,6 +3931,7 @@
           "companion": false,
           "appearance": "짧게 묶은 머리에 남색 스포츠 머리띠를 했다. 흰 셔츠와 회색 교복 조끼에 흰 운동화를 신었다.",
           "playerContext": "농구부 주장인 2학년 학생이다. 시작 시점에 나와 친분이 없고 팀에 들어오기로 정해진 관계도 아니다.",
+          "arousal": 25,
           "state": {},
           "relationships": {
             "hyeon-u": {
@@ -3854,6 +3971,7 @@
           "companion": false,
           "appearance": "부드럽게 굽은 짧은 머리에 둥근 테 안경을 썼다. 흰 셔츠와 회색 교복 조끼에 베이지 운동화를 신었다.",
           "playerContext": "가을제 음식 부스 메뉴를 고민하는 2학년이다. 나와는 아직 개인적 친분이 없고 취향도 서로 모른다.",
+          "arousal": 10,
           "state": {},
           "relationships": {
             "sun-ja": {
@@ -3875,6 +3993,7 @@
           "companion": false,
           "appearance": "어깨에 닿는 머리를 반묶음하고 하늘색 머리핀을 꽂았다. 흰 셔츠와 회색 교복 조끼 위에 하늘색 가디건을 걸쳤다.",
           "playerContext": "보건실 일을 돕는 2학년 학생이다. 의료진은 아니며 나와도 시작 시점에는 개인적인 친분이 없다.",
+          "arousal": 15,
           "state": {},
           "relationships": {
             "do-yun": {
@@ -3896,6 +4015,7 @@
           "companion": false,
           "appearance": "앞머리를 가지런히 정리하고 검은 둥근 안경을 썼다. 흰 셔츠와 회색 교복 조끼에 갈색 가디건을 걸쳤다.",
           "playerContext": "도서위원과 문예 활동을 하는 1학년 학생이다. 시작 시점에 나와 개인적인 친분은 없으며 개인 작품을 읽도록 허락한 상태도 아니다.",
+          "arousal": 15,
           "state": {},
           "relationships": {
             "se-jin": {
@@ -3926,6 +4046,7 @@
           "companion": false,
           "appearance": "짧은 머리 옆에 흰머리가 조금 섞였고 검은 테 안경을 썼다. 하늘색 셔츠와 진회색 면바지에 검은 단화를 신었다.",
           "playerContext": "학교의 기술 교사이자 행사 장비 담당이다. 나와는 교사와 학생의 관계이며 개인적인 친분은 없다.",
+          "arousal": 15,
           "state": {},
           "relationships": {
             "tae-seong": {
@@ -3956,6 +4077,7 @@
           "companion": false,
           "appearance": "단정한 단발과 얇은 갈색 테 안경이 눈에 띈다. 아이보리 셔츠 위에 남색 가디건을 걸치고 진회색 바지와 단화를 착용했다.",
           "playerContext": "나의 2학년 3반 담임이자 국어 교사이다. 오늘 전학 절차를 안내받았으며 사적인 친구나 가족 같은 관계로 정해져 있지 않다.",
+          "arousal": 10,
           "state": {},
           "relationships": {
             "dan-eun": {
@@ -3986,6 +4108,7 @@
           "companion": false,
           "appearance": "귀 아래로 내려오는 머리를 단정히 빗고 작은 둥근 안경을 썼다. 옅은 녹색 가디건과 흰 셔츠에 검은 면바지와 단화를 착용했다.",
           "playerContext": "학교 도서관 사서이다. 나와는 학교 이용자와 담당 직원의 관계로 시작하며 사적인 친분은 없다.",
+          "arousal": 5,
           "state": {},
           "relationships": {
             "ye-rin": {
@@ -4016,6 +4139,7 @@
           "companion": false,
           "appearance": "짧은 머리를 반듯하게 정리했고 얇은 금속테 안경을 썼다. 연한 파란색 셔츠 위에 흰 근무 가운을 입고 검은 바지와 단화를 착용했다.",
           "playerContext": "학교 보건교사이다. 나와는 학생과 보건교사의 관계로 시작하며 건강 정보나 사적인 사정을 이미 알고 있는 것은 아니다.",
+          "arousal": 10,
           "state": {},
           "relationships": {
             "so-min": {
@@ -4037,6 +4161,7 @@
           "companion": false,
           "appearance": "짧은 곱슬머리에 은빛 머리카락이 섞였고 갈색 테 안경을 썼다. 자주색 체크 셔츠 위에 남색 앞치마를 두르고 검은 운동화를 신었다.",
           "playerContext": "학교 앞 달팽이 문방구 주인이다. 가게에서 일하고 있으며, 나와는 처음 만나는 사이이다. 가족이나 오래 아는 이웃으로 정해져 있지 않다.",
+          "arousal": 10,
           "state": {},
           "relationships": {
             "i-deun": {
@@ -4500,6 +4625,8 @@
       "minute": 1080,
       "activeSceneId": "school-gate",
       "events": [],
+      "reactionClock": 0,
+      "reactionSequence": 0,
       "instances": [
         {
           "id": "seo-woo",
@@ -4509,6 +4636,7 @@
           "companion": true,
           "appearance": "턱 아래로 내려오는 단정한 단발에 노란 실핀을 꽂았다. 흰 셔츠와 회색 교복 조끼 위에 연노랑 가디건을 걸치고 검은 운동화를 신었다.",
           "playerContext": "이서우는 원래 솔빛고에 다니던 2학년 3반 학생이다. 나는 오늘 이 반으로 전학 왔고, 서우는 내 학교 안내를 맡아 정문에서 만나기로 했다. 우리는 오늘 처음 알게 된 사이이다.",
+          "arousal": 20,
           "state": {
             "role": "2학년 3반 전학생 안내 담당",
             "knownFacts": "나는 솔빛고에 원래 다니던 재학생이고, 오늘 전학 온 사람은 플레이어다. 플레이어와는 오늘 처음 정식으로 이야기한다. 2학년 3반 배정 사실과 주요 공개 통로를 안다. 강당 준비실의 손종이 보이지 않는다는 소문만 들었고 이유나 행방은 모른다. 노유준에게 수학 풀이를 도와주겠다는 약속을 한 번 미뤘다.",
@@ -4557,7 +4685,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "dan-eun",
@@ -4567,6 +4698,7 @@
           "companion": false,
           "appearance": "어깨에 닿는 머리를 낮게 묶고 검은 사각 시계를 찼다. 회색 교복 재킷과 흰 셔츠를 단정히 입고 검은 로퍼를 신었다.",
           "playerContext": "강다은은 솔빛고 2학년 3반의 기존 재학생이자 반장이다. 나는 오늘 이 반으로 전학 와서 반장으로 소개받았다. 아직 개인적으로 가까워진 사이는 아니다.",
+          "arousal": 25,
           "state": {
             "role": "2학년 3반 반장",
             "knownFacts": "전학생의 이름과 선호는 아직 모른다. 이서우가 준비표를 가져오기로 했다는 것, 임세진의 대본이 초안이라는 것만 확인했다. 손종의 행방은 모른다.",
@@ -4605,7 +4737,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "tae-seong",
@@ -4615,6 +4750,7 @@
           "companion": false,
           "appearance": "짧은 머리와 얇은 금속테 안경이 눈에 띈다. 회색 교복 조끼와 소매를 정리한 흰 셔츠에 검은 운동화를 신었다.",
           "playerContext": "교내 메이커 동아리에서 수리를 맡는 2학년이다. 시작 시점에는 나와 개인적인 친분이 없다.",
+          "arousal": 20,
           "state": {
             "role": "메이커 동아리 2학년",
             "knownFacts": "가을제 D-12 월요일 17시 10분 박정우 교사의 허락을 받고, 17시 35분 장하람과 회색 카트로 준비실의 황동 손종을 메이커실로 옮겼다. 종은 메이커실 수리 상자에 있다. 상태 확인 때문에 분리한 손잡이를 아직 재조립하지 못했다. 학생회에 이동 사실이 전달되었는지는 모른다. 방송 소문의 원인은 모른다.",
@@ -4653,7 +4789,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "ji-su",
@@ -4663,6 +4802,7 @@
           "companion": false,
           "appearance": "곧은 검은 머리를 귀 뒤로 넘기고 동그란 안경을 썼다. 흰 셔츠와 회색 교복 조끼에 검은 캔버스화를 신었다.",
           "playerContext": "사진 동아리의 2학년 학생이다. 나와는 아직 개인적인 추억이 없는 사이이며 촬영 동의를 따로 확인해야 한다.",
+          "arousal": 10,
           "state": {
             "role": "사진 동아리 전시 담당",
             "knownFacts": "월요일 17시 36분 동아리동 연결통로를 찍은 사진에 회색 카트 모서리가 있다. 운반한 사람의 얼굴과 상자 내용은 찍히지 않았다. 종이 실렸는지, 누가 옮겼는지는 직접 보지 못했다.",
@@ -4701,7 +4841,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "geon-u",
@@ -4711,6 +4854,7 @@
           "companion": false,
           "appearance": "약간 흐트러진 짧은 머리에 웃을 때 한쪽 볼에 보조개가 생긴다. 흰 셔츠와 회색 교복 조끼에 남색 집업을 걸쳤다.",
           "playerContext": "방송부에서 음향을 맡는 2학년이다. 시작 시점에는 나와 사적으로 알던 사이가 아니다.",
+          "arousal": 30,
           "state": {
             "role": "방송부 음향 담당",
             "knownFacts": "어제 18시 12분 1998년 개막 음원을 미리듣다가 출력 B를 복도로 둔 채 소리를 내보냈다. 곧 전원을 끄고 나왔으며, 복도에 있던 학생들이 자신이 나오기 전후를 정확히 봤는지는 모른다. 옛 녹음에는 손종 소리가 들어 있다. 실제 손종이 지금 어디 있는지는 모른다.",
@@ -4749,7 +4893,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "do-hyeon",
@@ -4759,6 +4906,7 @@
           "companion": false,
           "appearance": "짧은 머리를 옆으로 정리했고 가는 테 안경을 썼다. 교복 재킷과 흰 셔츠를 입고 검은 로퍼를 신었다.",
           "playerContext": "학생회 부회장인 2학년 학생이다. 나에게는 아직 공식 역할로만 알려진 사람이며 개인적 친분은 없다.",
+          "arousal": 20,
           "state": {
             "role": "학생회 부회장",
             "knownFacts": "월요일 박정우가 건넨 물품 수리 승인서 사본을 초록 파일에 넣었다. 행사 안내 인쇄물에 끼여 학생회 공용 장부에는 아직 옮기지 않았다. 승인 대상이 준비실의 손종이라는 문구는 읽었지만 수리 현장은 보지 못했다. 빈 받침대가 도난의 증거라고는 생각하지 않는다.",
@@ -4797,7 +4945,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "ha-rin",
@@ -4807,6 +4958,7 @@
           "companion": false,
           "appearance": "어깨 길이 머리 끝이 살짝 뻗쳐 있고 초록색 머리끈을 손목에 걸었다. 흰 셔츠와 회색 교복 조끼에 검은 캔버스화를 신었다.",
           "playerContext": "밴드부에서 기타와 보컬을 맡는 2학년이다. 오늘 전학 온 나와는 아직 개인적인 관계가 없다.",
+          "arousal": 30,
           "state": {
             "role": "밴드 동아리 기타·보컬",
             "knownFacts": "정민재가 저녁에 집 식당 일을 도우러 가야 한다는 사실은 알지만 오늘 정확한 출발 시간은 아직 묻지 않았다. 종소리 소문은 들었으나 녹음과 실물을 구별할 자료는 없다.",
@@ -4836,7 +4988,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "min-jae",
@@ -4846,6 +5001,7 @@
           "companion": false,
           "appearance": "짧게 자른 머리에 눈썹 한쪽이 조금 치켜올라 있다. 흰 셔츠와 회색 교복 조끼에 검은 운동화를 신었다.",
           "playerContext": "밴드부 드럼 담당인 2학년이다. 나와는 시작 시점에 친분이 없고 각자의 귀가 일정도 별개다.",
+          "arousal": 25,
           "state": {
             "role": "밴드 동아리 드럼",
             "knownFacts": "오늘 18시 25분에는 학교를 나서야 가족 식당에 맞춰 갈 수 있다. 건우가 어제 옛 음원을 찾았다는 얘기는 들었지만 테스트 현장에는 없었다.",
@@ -4875,7 +5031,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "su-a",
@@ -4885,6 +5044,7 @@
           "companion": false,
           "appearance": "앞머리가 눈썹 위에 닿고 긴 머리를 느슨하게 묶었다. 흰 셔츠와 회색 교복 조끼에 갈색 운동화를 신었다.",
           "playerContext": "미술 동아리에서 가을제 장식을 만드는 2학년이다. 시작 시점에는 나와 개인적으로 만나본 적이 없다.",
+          "arousal": 15,
           "state": {
             "role": "미술 동아리 무대 미술 담당",
             "knownFacts": "예산이 넉넉하지 않아 새 판넬보다 기존 판넬 재사용이 필요하다. 문하린이 무대 색을 요청했지만 공연 구성 전체는 아직 듣지 못했다. 손종의 이동이나 음원 소문에는 직접 아는 내용이 없다.",
@@ -4923,7 +5083,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "se-jin",
@@ -4933,6 +5096,7 @@
           "companion": false,
           "appearance": "귀를 덮는 머리를 가볍게 정리했고 얇은 둥근 안경을 썼다. 회색 교복 조끼 위에 남색 가디건을 걸치고 검은 단화를 신었다.",
           "playerContext": "임세진은 원래 솔빛고 2학년 3반에 다니던 학생이며 문예부에서 글을 쓴다. 나는 오늘 이 반으로 전학 와서 같은 반 학생으로 소개받았다. 아직 가까운 사이는 아니다.",
+          "arousal": 10,
           "state": {
             "role": "2학년 3반 문예부 대본 담당",
             "knownFacts": "강다은이 준비표 마감을 기다린다는 것을 안다. 조해솔은 시를 쓰지만 공개 여부는 본인이 정할 일이다. 가을제 손종 전통은 교지에서 읽은 정도라 현재 행방은 모른다.",
@@ -4962,7 +5126,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "ye-rin",
@@ -4972,6 +5139,7 @@
           "companion": false,
           "appearance": "턱선 길이의 머리를 귀 뒤로 넘기고 작은 은색 머리핀을 꽂았다. 흰 셔츠와 회색 교복 재킷에 흰 운동화를 신었다.",
           "playerContext": "교지 취재를 하는 2학년 학생이다. 나와 아직 친분이 없으며 전학생이라는 이유로 취재에 동의한 상태도 아니다.",
+          "arousal": 25,
           "state": {
             "role": "교지 편집부 취재 담당",
             "knownFacts": "학생회 공용 물품표에는 손종의 이동 칸이 비어 있다. 그것이 실제 물건이 도난당했다는 뜻인지는 모른다. 자료 열람실에 옛 개막 행사 기록이 있다는 사실을 알고 찾아왔다.",
@@ -5019,7 +5187,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "yu-jun",
@@ -5029,6 +5200,7 @@
           "companion": false,
           "appearance": "짧고 반듯한 머리에 검은 뿔테 안경을 썼다. 흰 셔츠와 회색 교복 조끼에 검은 운동화를 신었다.",
           "playerContext": "과학 동아리에서 실험을 하는 2학년이다. 나와는 아직 개인적인 친분이 없다.",
+          "arousal": 15,
           "state": {
             "role": "과학 동아리 측정 담당",
             "knownFacts": "건우가 방송부 장비를 다루는 사람이라는 것만 안다. 어제 소리의 실제 발생 위치나 시각은 측정하지 않았다. 측정 계획을 세웠다고 이미 결과가 나온 것은 아니다.",
@@ -5058,7 +5230,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "ha-ram",
@@ -5068,6 +5243,7 @@
           "companion": false,
           "appearance": "짧은 머리 윗부분이 조금 솟아 있고 눈을 맞추면 금세 표정이 달라진다. 흰 셔츠와 회색 교복 조끼에 파란 운동화를 신었다.",
           "playerContext": "메이커 동아리의 1학년 후배이다. 시작 시점에는 나와 서로를 잘 모르는 사이이며 친한 선후배로 정해져 있지 않다.",
+          "arousal": 30,
           "state": {
             "role": "메이커 동아리 신입 부원",
             "knownFacts": "월요일 17시 35분 윤태성과 회색 카트로 손종 상자를 메이커실로 옮기는 일을 도왔다. 태성이 선생님 허락을 받았다는 말은 들었지만 승인서를 직접 읽지는 않았다. 수리 상자 위치를 알고 있다. 사진에 자신이 찍혔는지는 모른다.",
@@ -5097,7 +5273,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "na-ri",
@@ -5107,6 +5286,7 @@
           "companion": false,
           "appearance": "긴 머리를 하나로 땋고 작은 초록 머리끈으로 묶었다. 흰 셔츠와 회색 교복 조끼 위에 연두색 가디건을 걸쳤다.",
           "playerContext": "온실 일을 돕는 1학년 학생이다. 나와는 아직 개인적 친분이 없고 조용하다는 이유로 동의를 대신할 수 없다.",
+          "arousal": 15,
           "state": {
             "role": "텃밭 동아리 신입 부원",
             "knownFacts": "온실 입구 화분 한 개의 흙이 다른 화분보다 말라 있다는 것을 방금 확인했다. 태성이 전에 화분 받침을 고쳐준 적은 있지만 손종 수리 일은 모른다.",
@@ -5136,7 +5316,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "hyeon-u",
@@ -5146,6 +5329,7 @@
           "companion": false,
           "appearance": "짧은 머리와 곧은 자세가 눈에 띈다. 흰 셔츠와 회색 교복 재킷에 검은 운동화를 신었다.",
           "playerContext": "육상부의 3학년 선배이다. 나와는 시작 시점에 사적 친분이 없고 개인적으로 운동을 가르치기로 한 적도 없다.",
+          "arousal": 10,
           "state": {
             "role": "3학년 육상부 학생",
             "knownFacts": "월요일에 연결통로 쪽으로 회색 카트가 지나가는 뒷모습을 멀리서 봤다. 누가 밀었고 무엇을 실었는지는 못 봤다. 어제는 18시 전에 귀가해서 방송 소리는 직접 듣지 못했다.",
@@ -5166,7 +5350,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "chae-won",
@@ -5176,6 +5363,7 @@
           "companion": false,
           "appearance": "긴 머리를 단정히 묶고 가는 은색 안경을 썼다. 회색 교복 재킷과 흰 셔츠에 검은 로퍼를 신었다.",
           "playerContext": "학생회장인 3학년 선배이다. 나에게는 공식 역할로 알려져 있을 뿐 개인적인 친분이나 약속은 없다.",
+          "arousal": 25,
           "state": {
             "role": "학생회장",
             "knownFacts": "학생회 공용 장부의 손종 이동 칸이 비어 있고 준비실 받침대가 비었다는 보고를 들었다. 직접 메이커실 수리 상자를 본 적은 없다. 한도현이 별도 사본을 보관하는지는 아직 모른다.",
@@ -5205,7 +5393,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "bo-ra",
@@ -5215,6 +5406,7 @@
           "companion": false,
           "appearance": "짧게 묶은 머리에 남색 스포츠 머리띠를 했다. 흰 셔츠와 회색 교복 조끼에 흰 운동화를 신었다.",
           "playerContext": "농구부 주장인 2학년 학생이다. 시작 시점에 나와 친분이 없고 팀에 들어오기로 정해진 관계도 아니다.",
+          "arousal": 25,
           "state": {
             "role": "2학년 농구부 주장",
             "knownFacts": "채원이 동선 확보를 우선한다는 것을 알고 있고 현우에게 무리한 지원을 부탁하고 싶지 않다. 수아가 표지를 만드는 중이지만 완성품은 아직 못 봤다.",
@@ -5253,7 +5445,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "i-deun",
@@ -5263,6 +5458,7 @@
           "companion": false,
           "appearance": "부드럽게 굽은 짧은 머리에 둥근 테 안경을 썼다. 흰 셔츠와 회색 교복 조끼에 베이지 운동화를 신었다.",
           "playerContext": "가을제 음식 부스 메뉴를 고민하는 2학년이다. 나와는 아직 개인적 친분이 없고 취향도 서로 모른다.",
+          "arousal": 10,
           "state": {
             "role": "2학년 생활문화 동아리 메뉴 담당",
             "knownFacts": "조리실은 사용 허가 범위가 아니고 급식실 홀에서 카드와 포장 간식만 정리할 수 있다. 달팽이 문방구에서 색지를 살 수 있지만 공짜라고 약속받지는 않았다.",
@@ -5283,7 +5479,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "so-min",
@@ -5293,6 +5492,7 @@
           "companion": false,
           "appearance": "어깨에 닿는 머리를 반묶음하고 하늘색 머리핀을 꽂았다. 흰 셔츠와 회색 교복 조끼 위에 하늘색 가디건을 걸쳤다.",
           "playerContext": "보건실 일을 돕는 2학년 학생이다. 의료진은 아니며 나와도 시작 시점에는 개인적인 친분이 없다.",
+          "arousal": 15,
           "state": {
             "role": "2학년 4반 보건위원",
             "knownFacts": "김도윤 보건교사가 학생에게 진료를 대신 맡기지 않는다는 원칙을 안다. 오늘 축제 준비로 피곤한 학생이 많다는 정도만 알고 개별 인물의 건강 상태는 직접 확인하지 않았다.",
@@ -5313,7 +5513,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "hae-sol",
@@ -5323,6 +5526,7 @@
           "companion": false,
           "appearance": "앞머리를 가지런히 정리하고 검은 둥근 안경을 썼다. 흰 셔츠와 회색 교복 조끼에 갈색 가디건을 걸쳤다.",
           "playerContext": "도서위원과 문예 활동을 하는 1학년 학생이다. 시작 시점에 나와 개인적인 친분은 없으며 개인 작품을 읽도록 허락한 상태도 아니다.",
+          "arousal": 15,
           "state": {
             "role": "1학년 도서위원·문예부 신입",
             "knownFacts": "최미정이 공개 행사 교지를 자료 열람실에 정리해 두었다는 것을 안다. 지금 손종이 어디 있는지, 누가 방송을 했는지는 모른다. 자기 초안은 타인에게 공개할 자료가 아니다.",
@@ -5352,7 +5556,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "jeong-u",
@@ -5362,6 +5569,7 @@
           "companion": false,
           "appearance": "짧은 머리 옆에 흰머리가 조금 섞였고 검은 테 안경을 썼다. 하늘색 셔츠와 진회색 면바지에 검은 단화를 신었다.",
           "playerContext": "학교의 기술 교사이자 행사 장비 담당이다. 나와는 교사와 학생의 관계이며 개인적인 친분은 없다.",
+          "arousal": 15,
           "state": {
             "role": "기술 교사·가을제 장비 담당",
             "knownFacts": "월요일 17시 10분 느슨한 손잡이의 황동 손종을 메이커실에서 점검하도록 윤태성에게 허락했고, 승인서 사본을 한도현에게 줬다. 이동과 작업 완료를 직접 지켜본 것은 아니다. 어제 종소리의 원인은 아직 확인하지 못했다.",
@@ -5391,7 +5599,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "eun-gyeong",
@@ -5401,6 +5612,7 @@
           "companion": false,
           "appearance": "단정한 단발과 얇은 갈색 테 안경이 눈에 띈다. 아이보리 셔츠 위에 남색 가디건을 걸치고 진회색 바지와 단화를 착용했다.",
           "playerContext": "나의 2학년 3반 담임이자 국어 교사이다. 오늘 전학 절차를 안내받았으며 사적인 친구나 가족 같은 관계로 정해져 있지 않다.",
+          "arousal": 10,
           "state": {
             "role": "2학년 3반 담임·국어 교사",
             "knownFacts": "플레이어가 오늘 2학년 3반으로 전학 왔고 서우가 안내에 자원했다는 것을 안다. 플레이어의 성별·취미·가족 사정은 설정되지 않았다. 손종과 방송 소문에는 확인한 내용이 없다.",
@@ -5430,7 +5642,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "mi-jeong",
@@ -5440,6 +5655,7 @@
           "companion": false,
           "appearance": "귀 아래로 내려오는 머리를 단정히 빗고 작은 둥근 안경을 썼다. 옅은 녹색 가디건과 흰 셔츠에 검은 면바지와 단화를 착용했다.",
           "playerContext": "학교 도서관 사서이다. 나와는 학교 이용자와 담당 직원의 관계로 시작하며 사적인 친분은 없다.",
+          "arousal": 5,
           "state": {
             "role": "사서교사",
             "knownFacts": "1998년 교지에는 옛 개막 음원과 손종을 함께 사용했다는 기록이 있다. 공개 자료는 자료 열람실에서 확인 가능하다. 지금 손종의 위치나 어제 장비 조작자는 모른다.",
@@ -5469,7 +5685,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "do-yun",
@@ -5479,6 +5698,7 @@
           "companion": false,
           "appearance": "짧은 머리를 반듯하게 정리했고 얇은 금속테 안경을 썼다. 연한 파란색 셔츠 위에 흰 근무 가운을 입고 검은 바지와 단화를 착용했다.",
           "playerContext": "학교 보건교사이다. 나와는 학생과 보건교사의 관계로 시작하며 건강 정보나 사적인 사정을 이미 알고 있는 것은 아니다.",
+          "arousal": 10,
           "state": {
             "role": "보건교사",
             "knownFacts": "오늘은 허가받은 축제 준비 시간이다. 개별 등장인물에게 특정 질병이나 부상이 있다는 설정은 없다. 손종이나 방송실에 관한 직접 지식은 없다.",
@@ -5499,7 +5719,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "sun-ja",
@@ -5509,6 +5732,7 @@
           "companion": false,
           "appearance": "짧은 곱슬머리에 은빛 머리카락이 섞였고 갈색 테 안경을 썼다. 자주색 체크 셔츠 위에 남색 앞치마를 두르고 검은 운동화를 신었다.",
           "playerContext": "학교 앞 달팽이 문방구 주인이다. 가게에서 일하고 있으며, 나와는 처음 만나는 사이이다. 가족이나 오래 아는 이웃으로 정해져 있지 않다.",
+          "arousal": 10,
           "state": {
             "role": "달팽이 문방구 주인",
             "knownFacts": "가을제 준비에 쓸 색지와 문구류를 문방구에서 판매한다. 재고와 주문 수량은 직접 확인해야 하며 물품 인계와 심부름은 상대와 합의가 필요하다. 손종이나 방송 소문에 관해 직접 본 것은 없다.",
@@ -5530,7 +5754,10 @@
           "active": true,
           "memories": [],
           "memo": null,
-          "reflectedThroughEventId": null
+          "reflectedThroughEventId": null,
+          "arousalEvidenceEventIds": [],
+          "reactionGauge": 0,
+          "lastOpportunitySequence": 0
         },
         {
           "id": "campus-map",

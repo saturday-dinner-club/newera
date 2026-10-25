@@ -49,7 +49,11 @@
           "mood": "긴장함"
         },
         "interactions": [],
-        "reactions": []
+        "reactions": [],
+        "reactionProfile": {
+          "baseSpeed": 10,
+          "talkativeness": 45
+        }
       },
       {
         "id": "director",
@@ -64,7 +68,11 @@
           "mood": "집중함"
         },
         "interactions": [],
-        "reactions": []
+        "reactions": [],
+        "reactionProfile": {
+          "baseSpeed": 12,
+          "talkativeness": 35
+        }
       },
       {
         "id": "companion",
@@ -79,7 +87,11 @@
           "mood": "기대함"
         },
         "interactions": [],
-        "reactions": []
+        "reactions": [],
+        "reactionProfile": {
+          "baseSpeed": 13,
+          "talkativeness": 75
+        }
       },
       {
         "id": "light",
@@ -168,7 +180,8 @@
         "sceneId": "lobby",
         "name": "서연",
         "companion": false,
-        "state": {}
+        "state": {},
+        "arousal": 35
       },
       {
         "id": "jieun",
@@ -176,7 +189,8 @@
         "sceneId": "stage",
         "name": "지은",
         "companion": false,
-        "state": {}
+        "state": {},
+        "arousal": 15
       },
       {
         "id": "harin",
@@ -184,7 +198,8 @@
         "sceneId": "lobby",
         "name": "하린",
         "companion": true,
-        "state": {}
+        "state": {},
+        "arousal": 20
       },
       {
         "id": "rehearsal-light",

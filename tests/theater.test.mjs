@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { exampleWorld } from '../src/lib/theater/fixtures.ts';
+import { neutralWorldDefinition as exampleWorld } from './fixtures.mjs';
 import { initialState, beginTurn, availableActions, applyAction, observation } from '../src/lib/theater/runtime.ts';
 import { resolveTurn as executeTurn, restoredProgress } from '../src/lib/theater/ensemble.ts';
 import { eventContent } from '../src/lib/theater/event-content.ts';
