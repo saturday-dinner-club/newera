@@ -367,7 +367,7 @@ export function enqueue(worldId: string, revision: number, request: PlayerReques
 		if (active) {
 			// Chat may arrive during inference with the revision rendered before its latest commit.
 			if (Number(active.revision) !== world.revision) throw new Error('장면이 변경되었습니다. 진행 상태를 새로고침해 주세요.');
-			if (request.kind !== 'speak') throw new Error('진행 중에는 채팅으로 말을 걸어 주세요.');
+			if (request.kind !== 'speak' && request.kind !== 'input') throw new Error('진행 중에는 입력창으로 행동이나 대사를 보내 주세요.');
 			actionForRequest(world, request);
 			const inputs: PlayerRequest[] = active.inputs_json ? JSON.parse(String(active.inputs_json)) : [];
 			inputs.push(request);

@@ -61,7 +61,7 @@ export const actions: Actions = {
 			const kind = String(body.get('kind'));
 			const worldId = String(body.get('worldId'));
 			const revision = Number(body.get('revision'));
-			if (kind === 'speak') queueStageTurn(worldId, revision, { kind, text: String(body.get('text') ?? ''), targetId: String(body.get('targetId') ?? '') || null });
+			if (kind === 'speak' || kind === 'input') queueStageTurn(worldId, revision, { kind, text: String(body.get('text') ?? ''), targetId: String(body.get('targetId') ?? '') || null });
 			else if (kind === 'move') queueStageTurn(worldId, revision, { kind, destinationId: String(body.get('destinationId')) });
 			else if (kind === 'interact') queueStageTurn(worldId, revision, { kind, targetId: String(body.get('targetId')), interactionId: String(body.get('interactionId')) });
 			else if (kind === 'wait') queueStageTurn(worldId, revision, { kind });

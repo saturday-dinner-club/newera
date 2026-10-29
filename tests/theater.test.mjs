@@ -8,6 +8,7 @@ import { memoryForEvent } from '../src/lib/theater/memory.ts';
 import { isExactRepeat } from '../src/lib/theater/performance.ts';
 import { sceneGraph } from '../src/lib/theater/scene-graph.ts';
 import { validateDefinition, validateState } from '../src/lib/theater/validation.ts';
+import { parsePlayerInput } from '../src/lib/theater/player-input.ts';
 import { buildBundle, validateBundle } from '../skills/newera-lore-authoring/scripts/lore-format.mjs';
 
 // These tests focus on scheduling and actions; relationship-specific tests supply their own reflection.
@@ -26,24 +27,81 @@ function soloWorld() {
 	return stage;
 }
 
-test('player-directed speech grants a full minute before any further inference without advancing game time', async () => {
+test('roleplay input parses actions, quoted speech, plain dialogue and escaped delimiters in order', () => {
+	assert.deepEqual(parsePlayerInput('*고개를 끄덕인다* "좋아요." *미소 짓는다*'), [
+		{ kind: 'act', text: '고개를 끄덕인다' }, { kind: 'speak', text: '좋아요.' }, { kind: 'act', text: '미소 짓는다' }
+	]);
+	assert.deepEqual(parsePlayerInput('*주변을 둘러본다*'), [{ kind: 'act', text: '주변을 둘러본다' }]);
+	assert.deepEqual(parsePlayerInput('안녕하세요.'), [{ kind: 'speak', text: '안녕하세요.' }]);
+	assert.deepEqual(parsePlayerInput('“반가워요.”'), [{ kind: 'speak', text: '반가워요.' }]);
+	assert.deepEqual(parsePlayerInput('*"안내" 표지판을 본다* "별표 * 표시가 있네."'), [
+		{ kind: 'act', text: '"안내" 표지판을 본다' }, { kind: 'speak', text: '별표 * 표시가 있네.' }
+	]);
+	assert.deepEqual(parsePlayerInput(String.raw`"그는 \"안녕\"이라고 했어." *\* 표시를 가리킨다*`), [
+		{ kind: 'speak', text: '그는 "안녕"이라고 했어.' }, { kind: 'act', text: '* 표시를 가리킨다' }
+	]);
+	assert.deepEqual(parsePlayerInput('안녕. *손을 흔든다* 잘 지냈어?'), [
+		{ kind: 'speak', text: '안녕.' }, { kind: 'act', text: '손을 흔든다' }, { kind: 'speak', text: '잘 지냈어?' }
+	]);
+});
+
+test('malformed roleplay input is rejected before time, events or memories change', () => {
+	for (const text of ['', '  ', '**', '""', '*   *', '*닫히지 않은 행동', '"닫히지 않은 대사', '*행동* "미완성', '가'.repeat(4001)]) {
+		const stage = world(), before = structuredClone(stage);
+		assert.throws(() => beginTurn(stage, { kind: 'input', text, targetId: null }));
+		assert.deepEqual(stage, before);
+	}
+});
+
+test('player action and dialogue events share one turn and preserve their roles in display, observations and saved memories', () => {
+	const stage = world(), before = structuredClone(stage);
+	beginTurn(stage, { kind: 'input', text: '*고개를 끄덕인다* "좋아요." *미소 짓는다*', targetId: 'seoyeon' });
+	assert.equal(stage.state.tick, 1);
+	assert.equal(stage.state.minute, before.state.minute + 1);
+	assert.deepEqual(stage.state.events.map(event => [event.kind, event.actorId, event.targetId, eventContent(event)]), [
+		['act', 'player', 'seoyeon', { narrative: '고개를 끄덕인다', utterance: null }],
+		['speak', 'player', 'seoyeon', { narrative: null, utterance: '좋아요.' }],
+		['act', 'player', 'seoyeon', { narrative: '미소 짓는다', utterance: null }]
+	]);
+	assert.ok(stage.state.events.every(event => event.tick === 1));
+	for (const id of ['seoyeon', 'harin']) {
+		const seen = observation(stage, instance(stage, id)).recentEvents;
+		assert.deepEqual(seen.map(event => event.body), stage.state.events.map(eventContent));
+		assert.deepEqual(instance(stage, id).memories.map(memory => memory.body), seen.map(event => event.body));
+	}
+	const restored = validateState(JSON.parse(JSON.stringify(stage.state)), stage.definition);
+	assert.deepEqual(restored.events.map(eventContent), stage.state.events.map(eventContent));
+	assert.deepEqual(restored.instances.find(actor => actor.id === 'harin').memories, instance(stage, 'harin').memories);
+	assert.deepEqual(stage.state.instances.find(actor => actor.id === 'desk-bell').state, before.state.instances.find(actor => actor.id === 'desk-bell').state);
+	assert.ok(!availableActions(stage, 'seoyeon').some(action => action.kind === 'act'), 'free player narration does not add NPC action candidates');
+});
+
+test('long player action descriptions round trip, and legacy speech remains literal without reinterpreting markers', () => {
+	const stage = world(), narrative = '가'.repeat(3998);
+	beginTurn(stage, { kind: 'input', text: `*${narrative}*`, targetId: null });
+	assert.equal(validateState(stage.state, stage.definition).events.at(-1).narrative, narrative);
+	beginTurn(stage, { kind: 'speak', text: '*예전 입력* "그대로"', targetId: null });
+	assert.deepEqual(eventContent(stage.state.events.at(-1)), { narrative: null, utterance: '*예전 입력* "그대로"' });
+});
+
+test('player-directed speech grants five minutes before any further inference without advancing game time', async () => {
 	let time = 1000, decisions = 0, reflections = 0, saved;
 	const result = await resolveTurn(soloWorld(), { kind: 'wait' }, {
 		async reflect() { reflections++; return { arousalUpdate: null, relationshipUpdates: [], memoUpdate: null }; },
 		async decide() { return { act: ++decisions === 1, inactivity: 'idle', model: 'fake' }; },
 		async perform() { return { actionId: 'speak:player', targetId: 'player', narrative: null, utterance: '어떻게 생각해?', memoUpdate: null, model: 'fake' }; }
 	}, () => {}, {
-		playerReplyTimeoutMs: 60000, now: () => time,
+		playerReplyTimeoutMs: 300000, now: () => time,
 		onProgress: (stage, progress) => { saved = structuredClone({ stage, progress }); },
 		wait: async (ms) => {
-			assert.equal(saved.progress.playerReplyUntil, 61000);
+			assert.equal(saved.progress.playerReplyUntil, 301000);
 			assert.equal(decisions, 1, 'no next decision during the reply window');
 			assert.equal(reflections, 0, 'no reflection during the reply window');
 			assert.equal(saved.stage.state.events.at(-1).utterance, '어떻게 생각해?');
 			time += ms;
 		}
 	});
-	assert.equal(time, 61000);
+	assert.equal(time, 301000);
 	assert.equal(decisions, 2);
 	assert.equal(result.state.tick, 1);
 	assert.equal(result.state.minute, 18 * 60 + 5, 'real-time waiting adds no game minutes');
@@ -70,6 +128,29 @@ test('a submitted reply ends the window immediately and is observed before the n
 	assert.equal(progress.consumedInputs, 1);
 	assert.equal(progress.playerReplyUntil, undefined);
 	assert.deepEqual(result.state.events.filter(event => event.actorId === 'player').map(event => event.kind), ['wait', 'speak']);
+});
+
+test('a silent player action ends the reply window and the next decision sees an action without invented speech', async () => {
+	const inputs = [];
+	let decisions = 0, waits = 0, progress;
+	const result = await resolveTurn(soloWorld(), { kind: 'wait' }, {
+		async decide(state) {
+			if (++decisions === 2) {
+				assert.equal(state.recentEvents.at(-1).kind, 'act');
+				assert.deepEqual(state.recentEvents.at(-1).body, { narrative: '고개를 끄덕인다', utterance: null });
+			}
+			return { act: decisions === 1, inactivity: 'idle', model: 'fake' };
+		},
+		async perform() { return { actionId: 'speak:player', targetId: 'player', narrative: null, utterance: '시작할까?', memoUpdate: null, model: 'fake' }; }
+	}, () => {}, {
+		playerReplyTimeoutMs: 60000, nextInput: index => inputs[index] ?? null,
+		onProgress: (_, cursor) => { progress = structuredClone(cursor); },
+		wait: async () => { waits++; inputs.push({ kind: 'input', text: '*고개를 끄덕인다*', targetId: 'seoyeon' }); }
+	});
+	assert.equal(waits, 1);
+	assert.equal(progress.consumedInputs, 1);
+	assert.equal(progress.playerReplyUntil, undefined);
+	assert.equal(result.state.tick, 2);
 });
 
 test('reply deadlines survive interruption and resume with only the remaining time and no replay', async () => {

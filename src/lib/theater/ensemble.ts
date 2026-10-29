@@ -49,7 +49,7 @@ export async function resolveTurn(original: World, request: PlayerRequest, direc
 	if (!progress) {
 		checkpoint();
 		beginTurn(draft, request);
-		const targetId = request.kind === 'speak' || request.kind === 'interact' ? request.targetId : null;
+		const targetId = request.kind === 'input' || request.kind === 'speak' || request.kind === 'interact' ? request.targetId : null;
 		progress = { pendingActorIds: castIds(draft, targetId), completedDecisions: 0, consumedInputs: 0, scheduler: { version: 1, priorityActorId: targetId, reservation: null } };
 		execution.onProgress?.(draft, progress);
 	}
@@ -61,7 +61,7 @@ export async function resolveTurn(original: World, request: PlayerRequest, direc
 			delete progress.playerReplyUntil;
 			beginTurn(draft, input);
 			progress.consumedInputs++;
-			const targetId = input.kind === 'speak' || input.kind === 'interact' ? input.targetId : null;
+			const targetId = input.kind === 'input' || input.kind === 'speak' || input.kind === 'interact' ? input.targetId : null;
 			progress.pendingActorIds = castIds(draft, targetId);
 			if (progress.scheduler) {
 				// The reserved readiness is durable, but a proposal made before this input is obsolete.

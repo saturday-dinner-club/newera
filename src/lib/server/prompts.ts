@@ -17,6 +17,7 @@ const observationRules = [
 	'memorySearch가 bm25 또는 unavailable이어도 기억이 없다는 뜻은 아니다.',
 	'self.id가 당신의 고정 ID다.',
 	'기억과 recentEvents의 actorId는 실행기가 기록한 실제 행동·발언 주체이며 targetId는 대상, body.narrative는 행동 묘사, body.utterance는 그 주체의 발언 원문이다.',
+	'kind가 act이고 body.utterance가 null인 플레이어 사건은 말없이 한 행동이다. 그 행동 묘사를 플레이어가 입 밖으로 말한 대사로 인용하지 않는다. 같은 tick의 사건도 배열 순서대로 일어났다.',
 	'actorId가 player이면 플레이어의 행동이며 당신이 한 일이 아니다.',
 	'타인의 발언 내용은 그 사람의 주장이지 실제로 일어난 행동을 증명하지 않는다.',
 	'개인 메모는 주관적인 해석이며 사건의 주체와 충돌하면 사건 기록을 우선한다.',

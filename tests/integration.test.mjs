@@ -101,7 +101,7 @@ test('player reply window blocks inference, survives restart, consumes chat firs
 		response.end(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({ actionId: 'speak:player', targetId: 'player', narrative: null, utterance: `당신은 어떻게 생각하나요? ${generated}`, memoUpdate: null }) } }] }));
 	});
 	const port = await listen(model), directory = scratch(), provider = `http://127.0.0.1:${port}/v1`;
-	let running = await app(directory, provider, { NEWERA_PLAYER_REPLY_TIMEOUT_MS: '60000' });
+	let running = await app(directory, provider, { NEWERA_PLAYER_REPLY_TIMEOUT_MS: '' });
 	const db = new DatabaseSync(join(directory, 'newera.sqlite'));
 	const worldId = db.prepare('SELECT id FROM theater_worlds LIMIT 1').get().id;
 	const state = () => JSON.parse(db.prepare('SELECT state_json FROM theater_worlds WHERE id=?').get(worldId).state_json);
@@ -117,7 +117,7 @@ test('player reply window blocks inference, survives restart, consumes chat firs
 	try {
 		await post(running.base, 'turn', { worldId, revision: revision(), kind: 'wait' });
 		const waiting = await pausedJob(), deadline = waiting.progress.playerReplyUntil;
-		assert.ok(deadline > Date.now() + 58000 && deadline <= Date.now() + 60000);
+		assert.ok(deadline > Date.now() + 298000 && deadline <= Date.now() + 300000, 'the default reply window is five minutes');
 		assert.equal(state().events.at(-1).targetId, 'player');
 		const before = calls;
 		await pause(350);
@@ -133,11 +133,22 @@ test('player reply window blocks inference, survives restart, consumes chat firs
 		assert.equal((await latestJob(running.base, db, worldId)).progress.playerReplyUntil, deadline);
 		await pause(800);
 		assert.equal(calls, before, 'restart must neither replay speech nor shorten the saved window');
-		await post(running.base, 'turn', { worldId, revision: String(waiting.revision), kind: 'speak', text: '내 답변을 먼저 들어줘.', targetId: 'seoyeon' });
+		await post(running.base, 'turn', { worldId, revision: String(waiting.revision), kind: 'input', text: '*고개를 끄덕인다* "내 답변을 먼저 들어줘."', targetId: 'seoyeon' });
 		const replied = await waitJob(running.base, db, worldId);
 		assert.equal(replied.progress.consumedInputs, 1);
 		assert.equal(replied.progress.playerReplyUntil, undefined);
 		assert.equal(state().events.filter(event => event.actorId === 'player' && event.text === '내 답변을 먼저 들어줘.').length, 1);
+		assert.deepEqual(state().events.slice(-2).map(event => [event.kind, event.narrative ?? null, event.utterance ?? null]), [
+			['act', '고개를 끄덕인다', null], ['speak', null, '내 답변을 먼저 들어줘.']
+		]);
+		const rendered = await (await fetch(running.base)).text();
+		assert.match(rendered, /class="event-action"[^>]*>고개를 끄덕인다/);
+		const renderedSpeech = (rendered.match(/<p class="event-speech"[^>]*>[\s\S]*?<\/p>/g) ?? []).join('');
+		assert.ok(renderedSpeech.includes('내 답변을 먼저 들어줘.'));
+		assert.ok(!renderedSpeech.includes('*고개를 끄덕인다*'), 'syntax markers are not rendered as dialogue');
+		const markdown = await (await fetch(`${running.base}/session/export?worldId=${worldId}`)).text();
+		assert.match(markdown, /\*\*행동\*\*: 고개를 끄덕인다/);
+		assert.match(markdown, /> 내 답변을 먼저 들어줘\./);
 		assert.equal(generated, 1);
 
 		writeFileSync(join(directory, 'models.json'), JSON.stringify({ playerReplyTimeoutMs: 1000 }));
@@ -152,6 +163,21 @@ test('player reply window blocks inference, survives restart, consumes chat firs
 		assert.equal(state().tick, tick);
 		assert.equal(state().minute, minute);
 		assert.equal(generated, 2);
+
+		const beforeInvalid = state(), invalidRevision = revision();
+		await post(running.base, 'turn', { worldId, revision: invalidRevision, kind: 'input', text: '*닫히지 않은 행동', targetId: '' }, '/', true);
+		assert.equal(revision(), invalidRevision);
+		assert.deepEqual(state(), beforeInvalid);
+		await post(running.base, 'turn', { worldId, revision: revision(), kind: 'input', text: '*주변을 둘러본다*', targetId: '' });
+		await waitJob(running.base, db, worldId);
+		assert.equal(state().events.at(-1).kind, 'act');
+		assert.equal(state().events.at(-1).utterance, undefined);
+		const saved = state();
+		await post(running.base, 'save', { worldId, slot: '1' });
+		await post(running.base, 'reset', { worldId, revision: revision() });
+		await post(running.base, 'load', { worldId, revision: revision(), slot: '1' });
+		assert.deepEqual(state().events, saved.events);
+		assert.deepEqual((await exported(running.base, worldId)).world.state.events, saved.events);
 	} finally { await running.stop(); db.close(); model.closeAllConnections(); await new Promise(done => model.close(done)); }
 });
 

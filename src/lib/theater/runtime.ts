@@ -1,6 +1,7 @@
 import type { DecisionTrace, EntityInstance, EntityTemplate, EventBody, Interaction, PlayerRequest, Properties, StageAction, StageEvent, World, WorldDefinition, WorldState } from './types.ts';
 import { memoryForEvent, witnessedMemories } from './memory.ts';
 import { nextPresentation } from './presentation.ts';
+import { parsePlayerInput } from './player-input.ts';
 
 export function initialState(definition: WorldDefinition): WorldState {
 	return {
@@ -141,13 +142,14 @@ export function availableActions(world: World, actorId: string): StageAction[] {
 }
 
 export function actionForRequest(world: World, request: PlayerRequest): StageAction {
-	if (request.kind === 'speak') {
+	if (request.kind === 'speak' || request.kind === 'input') {
 		if (!request.text.trim() || request.text.length > 4000) throw new Error('말할 내용을 1~4000자로 입력해 주세요.');
+		const parts = request.kind === 'input' ? parsePlayerInput(request.text) : null;
 		if (request.targetId) {
 			const target = instanceInScene(world, request.targetId, world.state.activeSceneId);
 			if (templateFor(world, target).kind !== 'character') throw new Error('대화 상대는 등장인물이어야 합니다.');
 		}
-		return { id: 'speak', kind: 'speak', label: request.text.trim(), targetId: request.targetId };
+		return { id: request.kind, kind: parts?.every((part) => part.kind === 'act') ? 'act' : 'speak', label: request.text.trim(), targetId: request.targetId };
 	}
 	const result = availableActions(world, 'player').find((action) => action.kind === request.kind &&
 		(request.kind !== 'move' || action.destinationId === request.destinationId) &&
@@ -162,6 +164,17 @@ export function beginTurn(world: World, request: PlayerRequest): StageEvent {
 	const minute = world.state.minute + (request.kind === 'wait' ? 5 : 1);
 	world.state.day += Math.floor(minute / 1440);
 	world.state.minute = minute % 1440;
+	if (request.kind === 'input') {
+		// The complete input commits as one turn, preserving action/speech order for every witness.
+		let result!: StageEvent;
+		for (const part of parsePlayerInput(request.text)) {
+			result = applyAction(world, 'player', { ...action, id: part.kind, kind: part.kind, label: part.text }, part.text, undefined, {
+				narrative: part.kind === 'act' ? part.text : null,
+				utterance: part.kind === 'speak' ? part.text : null
+			});
+		}
+		return result;
+	}
 	return applyAction(world, 'player', action, action.label);
 }
 

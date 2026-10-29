@@ -130,7 +130,7 @@ function interaction(value: unknown): Interaction {
 	const source = record(value, 'interaction');
 	return { id: identifier(source.id, 'interaction.id'), label: text(source.label, 'interaction.label', 200), description: text(source.description, 'interaction.description', 4000, true), conditions: conditions(source.conditions), effects: properties(source.effects, 'interaction.effects') };
 }
-const eventKinds: EventKind[] = ['speak', 'interact', 'wait', 'move', 'enter', 'leave', 'change'];
+const eventKinds: EventKind[] = ['speak', 'act', 'interact', 'wait', 'move', 'enter', 'leave', 'change'];
 function eventKind(value: unknown): EventKind {
 	if (!eventKinds.includes(value as EventKind)) throw new Error('이벤트 종류가 올바르지 않습니다.');
 	return value as EventKind;
@@ -285,7 +285,7 @@ export function validateState(value: unknown, definition: WorldDefinition): Worl
 			if (!definition.scenes.some((scene) => scene.id === result.destinationId)) throw new Error('이벤트의 목적지가 존재하지 않습니다.');
 		}
 		if (row.changes !== undefined) result.changes = properties(row.changes, 'event.changes');
-		if (row.narrative !== undefined) result.narrative = text(row.narrative, 'event.narrative', 2000);
+		if (row.narrative !== undefined) result.narrative = text(row.narrative, 'event.narrative', actorId === 'player' ? 4000 : 2000);
 		if (row.utterance !== undefined) result.utterance = text(row.utterance, 'event.utterance', 4000);
 		if (row.presentation !== undefined) {
 			const presentation = record(row.presentation, '등장 서술');

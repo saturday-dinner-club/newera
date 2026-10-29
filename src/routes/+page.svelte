@@ -328,7 +328,7 @@
 		</div>
 		{#if generating}
 			<div class="generation-status">
-				<p role="status">{#if playerReplyUntil !== undefined}당신의 답변을 기다립니다. 아래에 말을 입력해 주세요. 입력이 없으면 {replySeconds}초 후 자동으로 이어집니다.{:else}현장의 인물들이 각자의 다음 행동을 고르고 있습니다…{#if data.generation?.progress} (판단 {data.generation.progress.completedDecisions}회 · 대기 {data.generation.progress.pendingActorIds.length}명){/if}{/if}</p>
+				<p role="status">{#if playerReplyUntil !== undefined}당신의 답변을 기다립니다. 아래에 행동이나 대사를 입력해 주세요. 입력이 없으면 {replySeconds}초 후 자동으로 이어집니다.{:else}현장의 인물들이 각자의 다음 행동을 고르고 있습니다…{#if data.generation?.progress} (판단 {data.generation.progress.completedDecisions}회 · 대기 {data.generation.progress.pendingActorIds.length}명){/if}{/if}</p>
 				<form method="POST" action="?/stop" use:enhance={submitRetry}>
 					<input type="hidden" name="worldId" value={world.id} />
 					<input type="hidden" name="jobId" value={data.generation!.id} />
@@ -354,10 +354,10 @@
 		</div>
 		<section class="player-console"><p class="eyebrow">{#if playerReplyUntil !== undefined}당신이 답할 차례 · {replySeconds}초 남음{:else}YOUR NEXT LINE{/if}</p>
 			<form method="POST" action="?/turn" use:enhance={submitTurn} class="speech-form">
-				<input type="hidden" name="worldId" value={world.id} /><input type="hidden" name="revision" value={world.revision} /><input type="hidden" name="kind" value="speak" />
+				<input type="hidden" name="worldId" value={world.id} /><input type="hidden" name="revision" value={world.revision} /><input type="hidden" name="kind" value="input" />
 				<label>누구에게<select name="targetId" bind:value={targetId} disabled={submitting}><option value="">현장에 있는 모두에게</option>{#each characters as instance}<option value={instance.id}>{instance.name}</option>{/each}</select></label>
-				<label class="speech-input">나의 말<textarea name="text" rows="2" placeholder="지금 하고 싶은 말을 적어 주세요." maxlength="4000" required disabled={submitting}></textarea></label>
-				<button class="primary" disabled={submitting}>말하기</button>
+				<label class="speech-input">나의 행동과 대사<textarea name="text" rows="2" placeholder={'*고개를 끄덕인다* "좋아요. 함께 가요."'} aria-describedby="player-input-help" maxlength="4000" required disabled={submitting}></textarea><small id="player-input-help">*행동*과 "대사"를 순서대로 적어 주세요. 표기 없는 문장은 대사로 처리합니다.</small></label>
+				<button class="primary" disabled={submitting}>보내기</button>
 			</form>
 			<div class="stage-options">
 				<form method="POST" action="?/turn" use:enhance={submitTurn}><input type="hidden" name="worldId" value={world.id} /><input type="hidden" name="revision" value={world.revision} /><button name="kind" value="wait" disabled={busy}>잠시 지켜본다</button></form>

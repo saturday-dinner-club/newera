@@ -1,7 +1,7 @@
 export type Value = string | number | boolean | null;
 export type Properties = Record<string, Value>;
 export type EntityKind = 'character' | 'object';
-export type EventKind = 'speak' | 'interact' | 'wait' | 'move' | 'enter' | 'leave' | 'change';
+export type EventKind = 'speak' | 'act' | 'interact' | 'wait' | 'move' | 'enter' | 'leave' | 'change';
 
 export interface Condition { key: string; equals: Value }
 export interface Interaction {
@@ -212,13 +212,14 @@ export interface World {
 export interface WorldSummary { id: string; name: string; revision: number }
 export interface StageAction {
 	id: string;
-	kind: 'wait' | 'speak' | 'interact' | 'move';
+	kind: 'wait' | 'speak' | 'act' | 'interact' | 'move';
 	label: string;
 	targetId: string | null;
 	interactionId?: string;
 	destinationId?: string;
 }
 export type PlayerRequest =
+	| { kind: 'input'; text: string; targetId: string | null }
 	| { kind: 'speak'; text: string; targetId: string | null }
 	| { kind: 'wait' }
 	| { kind: 'move'; destinationId: string }
