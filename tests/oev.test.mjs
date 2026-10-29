@@ -793,6 +793,11 @@ test('model config reload validates a complete candidate and retains the last va
 		assert.equal(modelSettings().textModel, 'one');
 		writeFileSync(process.env.NEWERA_MODEL_CONFIG, JSON.stringify({ baseUrl: 'http://example.test/v1', textModel: 'two' }));
 		assert.equal(modelSettings().textModel, 'two');
+		writeFileSync(process.env.NEWERA_MODEL_CONFIG, JSON.stringify({ textModel: 'two', playerReplyTimeoutMs: 1500 }));
+		assert.equal(modelSettings().playerReplyTimeoutMs, 1500);
+		writeFileSync(process.env.NEWERA_MODEL_CONFIG, JSON.stringify({ textModel: 'broken', playerReplyTimeoutMs: -1 }));
+		assert.equal(modelSettings().playerReplyTimeoutMs, 1500);
+		assert.equal(modelSettings().textModel, 'two', 'an invalid reply timeout rejects the complete candidate');
 		writeFileSync(process.env.NEWERA_MODEL_CONFIG, JSON.stringify({ textModel: 'two', maxRetries: 1, retryBaseMs: 5, retryMaxMs: 10 }));
 		assert.equal(modelSettings().maxRetries, 1);
 		writeFileSync(process.env.NEWERA_MODEL_CONFIG, JSON.stringify({ textModel: 'broken', maxRetries: 6 }));

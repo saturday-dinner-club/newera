@@ -45,6 +45,7 @@ async function processJob(id: string): Promise<void> {
 			do {
 				await resolveTurn(getWorld(job.worldId), job.request, director, checkpoint, {
 					progress: job.progress,
+					playerReplyTimeoutMs: settings.playerReplyTimeoutMs,
 					nextInput: (consumedInputs) => nextJobInput(job, workerId, consumedInputs),
 					onProgress: (world, progress) => saveJobProgress(job, workerId, world, progress)
 				});

@@ -26,6 +26,108 @@ function soloWorld() {
 	return stage;
 }
 
+test('player-directed speech grants a full minute before any further inference without advancing game time', async () => {
+	let time = 1000, decisions = 0, reflections = 0, saved;
+	const result = await resolveTurn(soloWorld(), { kind: 'wait' }, {
+		async reflect() { reflections++; return { arousalUpdate: null, relationshipUpdates: [], memoUpdate: null }; },
+		async decide() { return { act: ++decisions === 1, inactivity: 'idle', model: 'fake' }; },
+		async perform() { return { actionId: 'speak:player', targetId: 'player', narrative: null, utterance: '어떻게 생각해?', memoUpdate: null, model: 'fake' }; }
+	}, () => {}, {
+		playerReplyTimeoutMs: 60000, now: () => time,
+		onProgress: (stage, progress) => { saved = structuredClone({ stage, progress }); },
+		wait: async (ms) => {
+			assert.equal(saved.progress.playerReplyUntil, 61000);
+			assert.equal(decisions, 1, 'no next decision during the reply window');
+			assert.equal(reflections, 0, 'no reflection during the reply window');
+			assert.equal(saved.stage.state.events.at(-1).utterance, '어떻게 생각해?');
+			time += ms;
+		}
+	});
+	assert.equal(time, 61000);
+	assert.equal(decisions, 2);
+	assert.equal(result.state.tick, 1);
+	assert.equal(result.state.minute, 18 * 60 + 5, 'real-time waiting adds no game minutes');
+	assert.equal(saved.progress.playerReplyUntil, undefined);
+});
+
+test('a submitted reply ends the window immediately and is observed before the next decision', async () => {
+	let time = 1000, decisions = 0, waits = 0, progress;
+	const inputs = [];
+	const result = await resolveTurn(soloWorld(), { kind: 'wait' }, {
+		async decide(state) {
+			if (++decisions === 2) assert.equal(state.recentEvents.at(-1).body.utterance, '좋아, 시작하자.');
+			return { act: decisions === 1, inactivity: 'idle', model: 'fake' };
+		},
+		async perform() { return { actionId: 'speak:player', targetId: 'player', narrative: null, utterance: '시작할까?', memoUpdate: null, model: 'fake' }; }
+	}, () => {}, {
+		playerReplyTimeoutMs: 60000, now: () => time,
+		nextInput: (index) => inputs[index] ?? null,
+		onProgress: (_, cursor) => { progress = structuredClone(cursor); },
+		wait: async (ms) => { waits++; time += ms; inputs.push({ kind: 'speak', text: '좋아, 시작하자.', targetId: 'seoyeon' }); }
+	});
+	assert.equal(waits, 1);
+	assert.equal(time, 1250);
+	assert.equal(progress.consumedInputs, 1);
+	assert.equal(progress.playerReplyUntil, undefined);
+	assert.deepEqual(result.state.events.filter(event => event.actorId === 'player').map(event => event.kind), ['wait', 'speak']);
+});
+
+test('reply deadlines survive interruption and resume with only the remaining time and no replay', async () => {
+	let saved, progress, time = 1000;
+	await assert.rejects(resolveTurn(soloWorld(), { kind: 'wait' }, {
+		async decide() { return { act: true, model: 'fake' }; },
+		async perform() { return { actionId: 'speak:player', targetId: 'player', narrative: null, utterance: '기다릴게.', memoUpdate: null, model: 'fake' }; }
+	}, () => {}, {
+		playerReplyTimeoutMs: 60000, now: () => time,
+		onProgress: (stage, cursor) => { saved = structuredClone(stage); progress = JSON.parse(JSON.stringify(cursor)); },
+		wait: async () => { throw new Error('restart'); }
+	}), /restart/);
+	assert.equal(progress.playerReplyUntil, 61000);
+	for (const resumedAt of [41000, 71000]) {
+		time = resumedAt;
+		let waited = 0;
+		const result = await resolveTurn(saved, { kind: 'wait' }, {
+			async decide() { assert.ok(time >= 61000); return { act: false, inactivity: 'idle', model: 'fake' }; },
+			async perform() { assert.fail('committed speech must not be replayed'); }
+		}, () => {}, {
+			progress: restoredProgress(progress), playerReplyTimeoutMs: 60000, now: () => time,
+			wait: async (ms) => { time += ms; waited += ms; }
+		});
+		assert.equal(waited, resumedAt < 61000 ? 20000 : 0);
+		assert.deepEqual(result.state.events, saved.state.events);
+	}
+});
+
+test('NPC-directed speech and exact repeated player-directed speech do not start additional reply windows', async () => {
+	for (const target of ['harin', 'player']) {
+		let time = 0, decisions = 0, windows = 0;
+		await resolveTurn(world(), { kind: 'wait' }, {
+			async decide(state) { return { act: state.self.id === 'seoyeon' && ++decisions <= 2, inactivity: 'idle', model: 'fake' }; },
+			async perform() { return { actionId: `speak:${target}`, targetId: target, narrative: null, utterance: '반가워.', memoUpdate: null, model: 'fake' }; }
+		}, () => {}, {
+			playerReplyTimeoutMs: 60000, now: () => time,
+			wait: async (ms) => { if (time === 0) windows++; time += ms; }
+		});
+		assert.equal(time, target === 'player' ? 60000 : 0);
+		assert.equal(windows, target === 'player' ? 1 : 0);
+	}
+});
+
+test('operator cancellation during a reply window prevents further inference and preserves the committed speech', async () => {
+	let stopped = false, saved, progress, decisions = 0;
+	await assert.rejects(resolveTurn(soloWorld(), { kind: 'wait' }, {
+		async decide() { decisions++; return { act: true, model: 'fake' }; },
+		async perform() { return { actionId: 'speak:player', targetId: 'player', narrative: null, utterance: '말해 줘.', memoUpdate: null, model: 'fake' }; }
+	}, () => { if (stopped) throw new Error('stopped'); }, {
+		playerReplyTimeoutMs: 60000,
+		onProgress: (stage, cursor) => { saved = structuredClone(stage); progress = structuredClone(cursor); },
+		wait: async () => { stopped = true; }
+	}), /stopped/);
+	assert.equal(decisions, 1);
+	assert.ok(progress.playerReplyUntil);
+	assert.equal(saved.state.events.at(-1).utterance, '말해 줘.');
+});
+
 test('exact repeated speech or physical action becomes silent idle without events, effects or proposed memo changes', async () => {
 	for (const physical of [false, true]) {
 		let calls = 0, cursor;

@@ -423,7 +423,7 @@ export function saveJobProgress(job: GenerationJob, workerId: string, world: Wor
 export function finishJob(job: GenerationJob, workerId: string): boolean {
 	return transaction(() => {
 		checkJob(job, workerId);
-		if (!job.progress || job.progress.pendingActorIds.length || job.progress.scheduler?.reservation) throw new Error('아직 처리하지 않은 반응이 있습니다.');
+		if (!job.progress || job.progress.pendingActorIds.length || job.progress.scheduler?.reservation || job.progress.playerReplyUntil !== undefined) throw new Error('아직 처리하지 않은 반응이 있습니다.');
 		if (nextJobInput(job, workerId, job.progress.consumedInputs)) return false;
 		store().prepare("UPDATE theater_jobs SET status = 'completed', completed_at = ? WHERE id = ? AND worker_id = ?").run(new Date().toISOString(), job.id, workerId);
 		return true;

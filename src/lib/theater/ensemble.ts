@@ -19,6 +19,10 @@ interface TurnExecution {
 	progress?: TurnProgress | null;
 	onProgress?: (world: World, progress: TurnProgress) => void;
 	nextInput?: (consumedInputs: number) => PlayerRequest | null;
+	/** Live hosts enable a reply window; headless simulations do not wait by default. */
+	playerReplyTimeoutMs?: number;
+	now?: () => number;
+	wait?: (ms: number) => Promise<void>;
 }
 
 /** Old one-pass jobs resume at their remaining actors without replaying committed events. */
@@ -38,6 +42,9 @@ function castIds(world: World, targetId: string | null = null): string[] {
 /** Publish only complete actions and a resume cursor; never publish incomplete model output. */
 export async function resolveTurn(original: World, request: PlayerRequest, director: Director, checkpoint: () => void = () => {}, execution: TurnExecution = {}): Promise<World> {
 	const draft = structuredClone(original);
+	const playerReplyTimeoutMs = execution.playerReplyTimeoutMs ?? 0;
+	const now = execution.now ?? Date.now;
+	const wait = execution.wait ?? ((ms: number) => new Promise<void>((done) => setTimeout(done, ms)));
 	let progress = restoredProgress(execution.progress);
 	if (!progress) {
 		checkpoint();
@@ -51,6 +58,7 @@ export async function resolveTurn(original: World, request: PlayerRequest, direc
 		// Consume chat at action boundaries; its event and consumed cursor commit together.
 		const input = execution.nextInput?.(progress.consumedInputs);
 		if (input) {
+			delete progress.playerReplyUntil;
 			beginTurn(draft, input);
 			progress.consumedInputs++;
 			const targetId = input.kind === 'speak' || input.kind === 'interact' ? input.targetId : null;
@@ -60,6 +68,17 @@ export async function resolveTurn(original: World, request: PlayerRequest, direc
 				progress.scheduler.reservation = null;
 				progress.scheduler.priorityActorId = targetId;
 			}
+			execution.onProgress?.(draft, progress);
+			continue;
+		}
+		// No reflection, scheduling or generation may overtake the player's reply window.
+		if (progress.playerReplyUntil !== undefined) {
+			const remaining = progress.playerReplyUntil - now();
+			if (remaining > 0) {
+				await wait(Math.min(250, remaining));
+				continue;
+			}
+			delete progress.playerReplyUntil;
 			execution.onProgress?.(draft, progress);
 			continue;
 		}
@@ -194,6 +213,9 @@ export async function resolveTurn(original: World, request: PlayerRequest, direc
 		}
 		if (cast.includes(actorId) && emitted.some((event) => event.actorId === actorId) && !progress.pendingActorIds.includes(actorId)) {
 			progress.pendingActorIds.push(actorId);
+		}
+		if (playerReplyTimeoutMs > 0 && emitted.some((event) => event.kind === 'speak' && event.actorId !== 'player' && event.targetId === 'player')) {
+			progress.playerReplyUntil = now() + playerReplyTimeoutMs;
 		}
 		checkpoint();
 		execution.onProgress?.(draft, progress);

@@ -35,6 +35,15 @@
 	let objects = $derived(present.filter((instance) => templateFor(world, instance).kind === 'object'));
 	let companions = $derived(world.state.instances.filter((instance) => instance.active && instance.companion));
 	let generating = $derived(data.generation?.status === 'pending' || data.generation?.status === 'running');
+	let playerReplyUntil = $derived(generating ? data.generation?.progress?.playerReplyUntil : undefined);
+	let replyClock = $state(Date.now());
+	let replySeconds = $derived(Math.max(0, Math.ceil(((playerReplyUntil ?? replyClock) - replyClock) / 1000)));
+	$effect(() => {
+		if (playerReplyUntil === undefined) return;
+		replyClock = Date.now();
+		const timer = setInterval(() => { replyClock = Date.now(); }, 250);
+		return () => clearInterval(timer);
+	});
 	let busy = $derived(submitting || generating);
 	let events = $derived(world.state.events.slice(-100));
 	let eventsById = $derived(new Map(world.state.events.map((event) => [event.id, event])));
@@ -319,7 +328,7 @@
 		</div>
 		{#if generating}
 			<div class="generation-status">
-				<p role="status">현장의 인물들이 각자의 다음 행동을 고르고 있습니다…{#if data.generation?.progress} (판단 {data.generation.progress.completedDecisions}회 · 대기 {data.generation.progress.pendingActorIds.length}명){/if}</p>
+				<p role="status">{#if playerReplyUntil !== undefined}당신의 답변을 기다립니다. 아래에 말을 입력해 주세요. 입력이 없으면 {replySeconds}초 후 자동으로 이어집니다.{:else}현장의 인물들이 각자의 다음 행동을 고르고 있습니다…{#if data.generation?.progress} (판단 {data.generation.progress.completedDecisions}회 · 대기 {data.generation.progress.pendingActorIds.length}명){/if}{/if}</p>
 				<form method="POST" action="?/stop" use:enhance={submitRetry}>
 					<input type="hidden" name="worldId" value={world.id} />
 					<input type="hidden" name="jobId" value={data.generation!.id} />
@@ -343,7 +352,7 @@
 		{/if}
 		{#if form?.message}<p class="feedback" role="status">{form.message}</p>{/if}
 		</div>
-		<section class="player-console"><p class="eyebrow">YOUR NEXT LINE</p>
+		<section class="player-console"><p class="eyebrow">{#if playerReplyUntil !== undefined}당신이 답할 차례 · {replySeconds}초 남음{:else}YOUR NEXT LINE{/if}</p>
 			<form method="POST" action="?/turn" use:enhance={submitTurn} class="speech-form">
 				<input type="hidden" name="worldId" value={world.id} /><input type="hidden" name="revision" value={world.revision} /><input type="hidden" name="kind" value="speak" />
 				<label>누구에게<select name="targetId" bind:value={targetId} disabled={submitting}><option value="">현장에 있는 모두에게</option>{#each characters as instance}<option value={instance.id}>{instance.name}</option>{/each}</select></label>

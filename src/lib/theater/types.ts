@@ -227,6 +227,8 @@ export interface TurnProgress {
 	pendingActorIds: string[];
 	completedDecisions: number;
 	consumedInputs: number;
+	/** Wall-clock deadline for a reply to a committed NPC speech directed at the player. */
+	playerReplyUntil?: number;
 	/** Missing on legacy jobs, which finish using their original FIFO order. */
 	scheduler?: ReactionSchedule;
 }

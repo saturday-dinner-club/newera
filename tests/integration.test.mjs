@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -37,7 +37,7 @@ async function app(directory, provider, environment = {}) {
 	const port = await freePort();
 	const base = `http://127.0.0.1:${port}`;
 	let output = '';
-	const child = spawn(process.execPath, ['build/index.js'], { env: { ...process.env, PORT: String(port), HOST: '127.0.0.1', ORIGIN: base, NEWERA_DATA_DIR: directory, NEWERA_OEV_BASE_URL: provider, NEWERA_DECISION_MODEL: 'actor-model', NEWERA_TEXT_MODEL: 'actor-model', NEWERA_MAX_RETRIES: '0', NEWERA_MEMORY_ENABLED: 'false', ...environment }, stdio: ['ignore', 'pipe', 'pipe'] });
+	const child = spawn(process.execPath, ['build/index.js'], { env: { ...process.env, PORT: String(port), HOST: '127.0.0.1', ORIGIN: base, NEWERA_DATA_DIR: directory, NEWERA_OEV_BASE_URL: provider, NEWERA_DECISION_MODEL: 'actor-model', NEWERA_TEXT_MODEL: 'actor-model', NEWERA_MAX_RETRIES: '0', NEWERA_MEMORY_ENABLED: 'false', NEWERA_PLAYER_REPLY_TIMEOUT_MS: '0', ...environment }, stdio: ['ignore', 'pipe', 'pipe'] });
 	for (const stream of [child.stdout, child.stderr]) stream.on('data', (chunk) => { output = (output + chunk).slice(-8000); });
 	for (let index = 0; index < 100; index++) {
 		if (child.exitCode !== null) throw new Error(`app exited: ${output}`);
@@ -86,6 +86,74 @@ async function waitJob(base, db, worldId, failure = false) {
 	}
 	assert.fail('job did not finish');
 }
+
+test('player reply window blocks inference, survives restart, consumes chat first and resumes automatically on timeout', async () => {
+	let generated = 0, allowed = 1, calls = 0;
+	const model = createServer(async (request, response) => {
+		response.setHeader('content-type', 'application/json');
+		if (request.url === '/v1/models') { response.end(JSON.stringify({ data: [{ id: 'actor-model', task: 'generation' }] })); return; }
+		const chunks = []; for await (const chunk of request) chunks.push(chunk);
+		const body = JSON.parse(Buffer.concat(chunks).toString());
+		calls++;
+		if (replyPerformanceReview(body, response) || replyReflection(body, response)) return;
+		if (body.questions) { response.end(participationResponse(generated < allowed ? 'act' : 'wait', 'idle')); return; }
+		generated++;
+		response.end(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({ actionId: 'speak:player', targetId: 'player', narrative: null, utterance: `당신은 어떻게 생각하나요? ${generated}`, memoUpdate: null }) } }] }));
+	});
+	const port = await listen(model), directory = scratch(), provider = `http://127.0.0.1:${port}/v1`;
+	let running = await app(directory, provider, { NEWERA_PLAYER_REPLY_TIMEOUT_MS: '60000' });
+	const db = new DatabaseSync(join(directory, 'newera.sqlite'));
+	const worldId = db.prepare('SELECT id FROM theater_worlds LIMIT 1').get().id;
+	const state = () => JSON.parse(db.prepare('SELECT state_json FROM theater_worlds WHERE id=?').get(worldId).state_json);
+	const revision = () => String(db.prepare('SELECT revision FROM theater_worlds WHERE id=?').get(worldId).revision);
+	async function pausedJob() {
+		for (let index = 0; index < 300; index++) {
+			const job = await latestJob(running.base, db, worldId);
+			if (job?.status === 'running' && job.progress?.playerReplyUntil) return job;
+			await pause(20);
+		}
+		assert.fail('reply window did not open');
+	}
+	try {
+		await post(running.base, 'turn', { worldId, revision: revision(), kind: 'wait' });
+		const waiting = await pausedJob(), deadline = waiting.progress.playerReplyUntil;
+		assert.ok(deadline > Date.now() + 58000 && deadline <= Date.now() + 60000);
+		assert.equal(state().events.at(-1).targetId, 'player');
+		const before = calls;
+		await pause(350);
+		assert.equal(calls, before, 'even other residents must not infer while the player can reply');
+		const page = await (await fetch(running.base)).text();
+		assert.match(page, /당신의 답변을 기다립니다/);
+		assert.ok(!/<textarea[^>]*disabled/.test(page), 'reply input remains enabled');
+
+		await running.stop();
+		db.prepare("UPDATE theater_jobs SET heartbeat_at='2000-01-01T00:00:00.000Z' WHERE id=?").run(waiting.id);
+		// New windows use the new setting, but the accepted window retains its absolute deadline.
+		running = await app(directory, provider, { NEWERA_PLAYER_REPLY_TIMEOUT_MS: '700' });
+		assert.equal((await latestJob(running.base, db, worldId)).progress.playerReplyUntil, deadline);
+		await pause(800);
+		assert.equal(calls, before, 'restart must neither replay speech nor shorten the saved window');
+		await post(running.base, 'turn', { worldId, revision: String(waiting.revision), kind: 'speak', text: '내 답변을 먼저 들어줘.', targetId: 'seoyeon' });
+		const replied = await waitJob(running.base, db, worldId);
+		assert.equal(replied.progress.consumedInputs, 1);
+		assert.equal(replied.progress.playerReplyUntil, undefined);
+		assert.equal(state().events.filter(event => event.actorId === 'player' && event.text === '내 답변을 먼저 들어줘.').length, 1);
+		assert.equal(generated, 1);
+
+		writeFileSync(join(directory, 'models.json'), JSON.stringify({ playerReplyTimeoutMs: 1000 }));
+		allowed = 2;
+		await post(running.base, 'turn', { worldId, revision: revision(), kind: 'wait' });
+		const expiring = await pausedJob(), tick = state().tick, minute = state().minute;
+		assert.ok(expiring.progress.playerReplyUntil > Date.now() + 800 && expiring.progress.playerReplyUntil <= Date.now() + 1000, 'file reload changes the next window without restarting');
+		const completed = await waitJob(running.base, db, worldId);
+		assert.ok(Date.now() >= expiring.progress.playerReplyUntil);
+		assert.equal(completed.progress.playerReplyUntil, undefined);
+		assert.equal(completed.progress.consumedInputs, 0);
+		assert.equal(state().tick, tick);
+		assert.equal(state().minute, minute);
+		assert.equal(generated, 2);
+	} finally { await running.stop(); db.close(); model.closeAllConnections(); await new Promise(done => model.close(done)); }
+});
 
 test('weighted worker preserves reserved opportunities across failure and restart, and editor settings round-trip through slots and export', async () => {
 	const directory = scratch();

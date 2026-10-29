@@ -21,6 +21,7 @@ export interface Settings extends RetryPolicy {
 	timeoutMs: number;
 	decisionTimeoutMs: number;
 	generationHistoryTokens: number;
+	playerReplyTimeoutMs: number;
 	embeddingModel: string;
 	embeddingDimensions: number;
 	embeddingTimeoutMs: number;
@@ -56,6 +57,7 @@ export function modelSettings(): Settings {
 			timeoutMs: integerSetting(file.timeoutMs ?? process.env.NEWERA_LLM_TIMEOUT_MS, 120000, '생성 대기 시간', 1800000),
 			decisionTimeoutMs: integerSetting(file.decisionTimeoutMs ?? process.env.NEWERA_DECISION_TIMEOUT_MS, 120000, '판단 대기 시간', 1800000),
 			generationHistoryTokens: integerSetting(file.generationHistoryTokens ?? process.env.NEWERA_GENERATION_HISTORY_TOKENS, 32768, '생성 히스토리 토큰 한도', 131072, 256),
+			playerReplyTimeoutMs: integerSetting(file.playerReplyTimeoutMs ?? process.env.NEWERA_PLAYER_REPLY_TIMEOUT_MS, 60000, '플레이어 응답 대기 시간', 300000, 0),
 			embeddingModel: text(file.embeddingModel ?? process.env.NEWERA_EMBEDDING_MODEL ?? 'embeddinggemma2', '임베딩 모델', 200),
 			embeddingDimensions: integerSetting(file.embeddingDimensions ?? process.env.NEWERA_EMBEDDING_DIMENSIONS, 768, '임베딩 차원', 4096),
 			embeddingTimeoutMs: integerSetting(file.embeddingTimeoutMs ?? process.env.NEWERA_EMBEDDING_TIMEOUT_MS, 10000, '임베딩 대기 시간', 120000),
