@@ -108,8 +108,19 @@ h1, h2, h3, h4 { color: #f1e9de; }
 .generation-error small { display: block; }
 .player-console { flex-shrink: 0; min-width: 0; border-top: 1px solid #5b4f3e; padding: 12px 0 calc(12px + env(safe-area-inset-bottom)); background: #191a1e; }
 .player-console > .eyebrow { display: none; }
-.speech-form { display: grid; grid-template-columns: minmax(110px, 160px) minmax(0, 1fr) auto; gap: 10px; align-items: end; }
+.speech-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; }
 .speech-form label { gap: 5px; font-size: 11px; }
+.recipient-picker { grid-column: 1 / -1; min-width: 0; margin: 0; padding: 0; border: 0; }
+.recipient-picker legend { padding: 0; margin-bottom: 8px; color: #bfb8ad; font-size: 11px; }
+.recipient-tags { display: flex; flex-wrap: wrap; gap: 7px; }
+.speech-form .recipient-tag { display: block; position: relative; min-width: 0; max-width: 100%; cursor: pointer; }
+.recipient-tag input { position: absolute; width: 1px; height: 1px; margin: 0; padding: 0; overflow: hidden; clip-path: inset(50%); }
+.recipient-tag span { display: block; padding: 8px 14px; border: 1px solid #5d5549; border-radius: 999px; background: #242321; color: #bfb8ad; line-height: 1.4; overflow-wrap: anywhere; }
+.recipient-tag:hover span { border-color: var(--accent); background: #36312a; }
+.recipient-tag input:checked + span { color: #f4dfbb; border-color: #b6976b; background: #514131; }
+.recipient-tag input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 3px; }
+.recipient-picker:disabled .recipient-tag { opacity: .45; cursor: default; }
+.recipient-dropdown { grid-column: 1 / -1; width: min(100%, 320px); }
 .speech-input textarea { min-height: 64px; max-height: 22dvh; }
 .player-console > .stage-options { flex-wrap: nowrap; overflow-x: auto; margin-top: 10px; padding-bottom: 3px; gap: 7px; }
 .player-console > .stage-options form { flex-shrink: 0; }
@@ -177,8 +188,6 @@ h1, h2, h3, h4 { color: #f1e9de; }
 	.objects-content > .eyebrow, .objects-content > h2 { display: none; }
 	.player-console { grid-column: 2; grid-row: 4; }
 	.speech-form { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
-	.speech-form > label:first-of-type { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; }
-	.speech-form > label:first-of-type select { flex: 1; width: auto; }
 }
 @media (max-width: 680px) {
 	.session-actions { width: 100%; justify-content: flex-start; }

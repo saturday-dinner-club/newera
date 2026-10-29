@@ -355,7 +355,17 @@
 		<section class="player-console"><p class="eyebrow">{#if playerReplyUntil !== undefined}당신이 답할 차례 · {replySeconds}초 남음{:else}YOUR NEXT LINE{/if}</p>
 			<form method="POST" action="?/turn" use:enhance={submitTurn} class="speech-form">
 				<input type="hidden" name="worldId" value={world.id} /><input type="hidden" name="revision" value={world.revision} /><input type="hidden" name="kind" value="input" />
-				<label>누구에게<select name="targetId" bind:value={targetId} disabled={submitting}><option value="">현장에 있는 모두에게</option>{#each characters as instance}<option value={instance.id}>{instance.name}</option>{/each}</select></label>
+				{#if characters.length < 8}
+					<fieldset class="recipient-picker" disabled={submitting}>
+						<legend>누구에게</legend>
+						<div class="recipient-tags">
+							<label class="recipient-tag"><input type="radio" name="targetId" value="" bind:group={targetId} /><span>모두에게</span></label>
+							{#each characters as instance (instance.id)}<label class="recipient-tag"><input type="radio" name="targetId" value={instance.id} bind:group={targetId} /><span>{instance.name}</span></label>{/each}
+						</div>
+					</fieldset>
+				{:else}
+					<label class="recipient-dropdown">누구에게<select name="targetId" bind:value={targetId} disabled={submitting}><option value="">현장에 있는 모두에게</option>{#each characters as instance}<option value={instance.id}>{instance.name}</option>{/each}</select></label>
+				{/if}
 				<label class="speech-input">나의 행동과 대사<textarea name="text" rows="2" placeholder={'*고개를 끄덕인다* "좋아요. 함께 가요."'} aria-describedby="player-input-help" maxlength="4000" required disabled={submitting}></textarea><small id="player-input-help">*행동*과 "대사"를 순서대로 적어 주세요. 표기 없는 문장은 대사로 처리합니다.</small></label>
 				<button class="primary" disabled={submitting}>보내기</button>
 			</form>
