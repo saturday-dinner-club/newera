@@ -384,9 +384,14 @@ export function enqueue(worldId: string, revision: number, request: PlayerReques
 		if (active) {
 			// Chat may arrive during inference with the revision rendered before its latest commit.
 			if (Number(active.revision) !== world.revision) throw new Error('장면이 변경되었습니다. 진행 상태를 새로고침해 주세요.');
-			if (request.kind !== 'speak' && request.kind !== 'input') throw new Error('진행 중에는 입력창으로 행동이나 대사를 보내 주세요.');
-			actionForRequest(world, request);
 			const inputs: PlayerRequest[] = active.inputs_json ? JSON.parse(String(active.inputs_json)) : [];
+			if (request.kind === 'wait') {
+				const progress = restoredProgress(active.progress_json ? JSON.parse(String(active.progress_json)) : null);
+				// Only the current reply window accepts waiting as a player action. A stale click must not advance a later scene.
+				if (world.revision !== revision || !progress?.playerReplyUntil || progress.playerReplyUntil <= Date.now()) throw new Error('지금은 답변을 기다리는 차례가 아닙니다. 화면을 새로고침해 주세요.');
+				if (inputs.length > progress.consumedInputs) throw new Error('먼저 보낸 입력을 반영하고 있어요. 잠시 기다려 주세요.');
+			} else if (request.kind !== 'speak' && request.kind !== 'input') throw new Error('진행 중에는 입력창으로 행동이나 대사를 보내 주세요.');
+			actionForRequest(world, request);
 			inputs.push(request);
 			store().prepare('UPDATE theater_jobs SET inputs_json = ? WHERE id = ?').run(JSON.stringify(inputs), String(active.id));
 			return jobFromRow(active);

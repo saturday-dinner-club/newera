@@ -54,6 +54,7 @@
 		return () => clearInterval(timer);
 	});
 	let busy = $derived(submitting || generating);
+	let canWait = $derived(!submitting && (!generating || (playerReplyUntil !== undefined && replySeconds > 0)));
 	let events = $derived(world.state.events.slice(-100));
 	let transcript = $derived(transcriptGroups(events));
 	let eventsById = $derived(new Map(world.state.events.map((event) => [event.id, event])));
@@ -404,7 +405,7 @@
 			</form>
 			<div class="console-tools"><details class="input-help"><summary>입력 도움말</summary><p id="player-input-help">*행동*과 "대사"를 순서대로 적어 주세요. 표기 없는 문장은 대사로 처리합니다. 예: *고개를 끄덕인다* "좋아요."</p></details><button type="button" onclick={() => { actionsOpen = !actionsOpen; }} aria-expanded={actionsOpen}>행동 · 이동 {actionsOpen ? "접기" : "열기"}</button></div>
 			<div class="stage-options console-actions" class:actions-open={actionsOpen}>
-				<form method="POST" action="?/turn" use:enhance={submitTurn}><input type="hidden" name="worldId" value={world.id} /><input type="hidden" name="revision" value={world.revision} /><button name="kind" value="wait" disabled={busy}>잠시 지켜본다</button></form>
+				<form method="POST" action="?/turn" use:enhance={submitTurn}><input type="hidden" name="worldId" value={world.id} /><input type="hidden" name="revision" value={world.revision} /><button name="kind" value="wait" disabled={!canWait} title="게임 속 시간으로 5분 동안 지켜봅니다">잠시 지켜본다</button></form>
 				{#each scene.exits as exit}{@const destination = world.definition.scenes.find((entry) => entry.id === exit)!}<form method="POST" action="?/turn" use:enhance={submitTurn}><input type="hidden" name="worldId" value={world.id} /><input type="hidden" name="revision" value={world.revision} /><input type="hidden" name="kind" value="move" /><button name="destinationId" value={exit} disabled={busy}>{destination.name}(으)로 →</button></form>{/each}
 			</div>
 		</section>

@@ -231,6 +231,9 @@ test('player reply window blocks inference, survives restart, consumes chat firs
 		const page = await (await fetch(running.base)).text();
 		assert.match(page, /당신의 이야기를 기다려요/);
 		assert.ok(!/<textarea[^>]*disabled/.test(page), 'reply input remains enabled');
+		assert.ok(!/<button[^>]*name="kind"[^>]*disabled/.test(page), 'waiting is enabled during the player reply window');
+		await post(running.base, 'turn', { worldId, revision: String(waiting.revision - 1), kind: 'wait' }, '/', true);
+		assert.equal((await latestJob(running.base, db, worldId)).progress.playerReplyUntil, deadline, 'a stale wait cannot consume the current window');
 
 		await running.stop();
 		db.prepare("UPDATE theater_jobs SET heartbeat_at='2000-01-01T00:00:00.000Z' WHERE id=?").run(waiting.id);
@@ -300,6 +303,33 @@ test('player reply window blocks inference, survives restart, consumes chat firs
 		assert.equal(state().minute, beforeSkip.minute);
 		assert.equal(state().events.filter(event => event.actorId === 'player').length, beforeSkip.events.filter(event => event.actorId === 'player').length);
 		assert.equal(generated, 4);
+
+		// Waiting is a durable player action during a reply window, with its usual five game minutes.
+		allowed = 5;
+		await post(running.base, 'turn', { worldId, revision: revision(), kind: 'speak', text: '잠깐 기다릴게요.' });
+		const waitWindow = await pausedJob(), beforeWait = structuredClone(state());
+		await running.stop();
+		// Hold the worker lease so both submissions reach the same unconsumed window deterministically.
+		db.prepare("UPDATE theater_jobs SET worker_id='held-for-input',heartbeat_at='2100-01-01T00:00:00.000Z' WHERE id=?").run(waitWindow.id);
+		running = await app(directory, provider, { NEWERA_PLAYER_REPLY_TIMEOUT_MS: '' });
+		const waitFields = { worldId, revision: String(waitWindow.revision), kind: 'wait' };
+		await post(running.base, 'turn', waitFields);
+		await post(running.base, 'turn', waitFields, '/', true);
+		assert.deepEqual(JSON.parse(db.prepare('SELECT inputs_json FROM theater_jobs WHERE id=?').get(waitWindow.id).inputs_json), [{ kind: 'wait' }], 'a double click queues only one wait');
+		assert.deepEqual(state(), beforeWait, 'accepting input does not advance time before the worker commits');
+		await running.stop();
+		db.prepare("UPDATE theater_jobs SET heartbeat_at='2000-01-01T00:00:00.000Z' WHERE id=?").run(waitWindow.id);
+		running = await app(directory, provider, { NEWERA_PLAYER_REPLY_TIMEOUT_MS: '' });
+		const waited = await waitJob(running.base, db, worldId);
+		assert.equal(waited.id, waitWindow.id);
+		assert.equal(waited.progress.consumedInputs, 1);
+		assert.equal(waited.progress.playerReplyUntil, undefined);
+		assert.equal(state().tick, beforeWait.tick + 1);
+		assert.equal(state().day * 1440 + state().minute, beforeWait.day * 1440 + beforeWait.minute + 5);
+		assert.equal(state().events.length, beforeWait.events.length + 1);
+		assert.equal(state().events.at(-1).actorId, 'player');
+		assert.equal(state().events.at(-1).kind, 'wait');
+		assert.equal(generated, 5, 'waiting creates no invented speech');
 
 		const beforeInvalid = state(), invalidRevision = revision();
 		await post(running.base, 'turn', { worldId, revision: invalidRevision, kind: 'input', text: '*닫히지 않은 행동', targetId: '' }, '/', true);
@@ -684,6 +714,8 @@ test('individual results are visible while the next inference is pending and res
 		assert.match(page, /서연의 확정된 대사/);
 		assert.ok(!page.includes('하린의 확정된 대사'));
 		assert.match(page, /이야기가 이어지고 있어요/);
+		assert.match(page, /<button[^>]*name="kind"[^>]*disabled/, 'waiting stays disabled while an NPC response is in flight');
+		await post(running.base, 'turn', { worldId, revision: String(partial.revision), kind: 'wait' }, '/', true);
 		await post(running.base, 'models', { worldId, decisionModel: 'other-model', textModel: 'other-model' });
 
 		await running.stop();

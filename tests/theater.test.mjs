@@ -130,6 +130,33 @@ test('skipping the current reply window consumes queued input first and leaves n
 	}
 });
 
+test('deliberate player waiting answers the reply window once and advances five game minutes without speech', async () => {
+	const stage = soloWorld(), inputs = [];
+	const initialMinute = stage.state.minute;
+	let decisions = 0, cursor;
+	const result = await resolveTurn(stage, { kind: 'speak', text: '다음은요?', targetId: 'seoyeon' }, {
+		async decide(state) {
+			if (++decisions === 2) {
+				assert.equal(state.recentEvents.at(-1).kind, 'wait');
+				assert.equal(state.recentEvents.at(-1).actorId, 'player');
+				assert.equal(state.time.minute, initialMinute + 6);
+			}
+			return { act: decisions === 1, inactivity: 'idle', model: 'fake' };
+		},
+		async perform() { return { actionId: 'speak:player', targetId: 'player', narrative: null, utterance: '조금 기다려 줄래요?', memoUpdate: null, model: 'fake' }; }
+	}, () => {}, {
+		playerReplyTimeoutMs: 300000,
+		nextInput: index => inputs[index] ?? null,
+		onProgress: (_, progress) => { cursor = structuredClone(progress); },
+		wait: async () => { inputs.push({ kind: 'wait' }); }
+	});
+	assert.equal(result.state.tick, 2);
+	assert.equal(cursor.consumedInputs, 1);
+	assert.equal(cursor.playerReplyUntil, undefined);
+	assert.equal(cursor.playerReplyEventId, undefined);
+	assert.deepEqual(result.state.events.filter(event => event.actorId === 'player').map(event => event.kind), ['speak', 'wait']);
+});
+
 test('a submitted reply ends the window immediately and is observed before the next decision', async () => {
 	let time = 1000, decisions = 0, waits = 0, progress;
 	const inputs = [];
