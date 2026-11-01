@@ -28,13 +28,13 @@
 		finally { saving = false; }
 	}
 </script>
-<section class="image-model" aria-label="이미지 생성 모델">
+<section class="image-model" aria-label="삽화 설정">
 	<form method="POST" action="?/imagePreset" use:enhance={save} class="settings-form">
 		<input type="hidden" name="worldId" value={world.id} />
-		<label>이미지 생성 프리셋<select name="imagePresetId" bind:value={selected} disabled={saving}><option value="">이미지 사용 안 함</option>{#each presets as preset}<option value={preset.id}>{preset.name} · {imageProviderNames[preset.provider]}</option>{/each}</select></label>
+		<label>삽화 프리셋<select name="imagePresetId" bind:value={selected} disabled={saving}><option value="">이미지 사용 안 함</option>{#each presets as preset}<option value={preset.id}>{preset.name} · {imageProviderNames[preset.provider]}</option>{/each}</select></label>
 		<div class="button-row"><button disabled={saving}>이미지 프리셋 적용</button><a href="/images">이미지 프리셋 관리 ↗</a></div>
 	</form>
-	<p class="field-hint">생성 조건과 태그·자연어 프롬프트 지침은 <a href="/lores?tab=world">로어북의 세계관 설정</a>에 작성하세요. 판단 모델이 System One으로 생성 여부를 결정하고, 생성 모델이 이미지 프롬프트를 작성합니다.</p>
+	<p class="field-hint">삽화를 더할 조건과 묘사 지침은 <a href="/lores?tab=world">로어북의 세계관 설정</a>에 작성하세요. 설정한 조건과 이야기의 흐름에 맞춰 장면에 삽화가 더해집니다.</p>
 	{#if count}<button type="button" onclick={clearImages} disabled={saving}>삽화 기록 비우기 ({count}/100)</button>{/if}
 	{#if notice}<p class="feedback" role="status">{notice}</p>{/if}{#if error}<p class="feedback error" role="alert">{error}</p>{/if}
 </section>

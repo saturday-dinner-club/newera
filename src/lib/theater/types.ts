@@ -105,9 +105,12 @@ export interface WorldDefinition {
 	/** Minimum elapsed minutes before a different scene can prompt another outfit choice. */
 	appearanceChangeMinutes?: number;
 }
+export interface ExpressionPart { kind: 'act' | 'speak'; text: string }
 export interface EventBody {
 	narrative: string | null;
 	utterance: string | null;
+	/** Ordered expression; absent on older events with one narrative/utterance pair. */
+	parts?: ExpressionPart[];
 }
 export interface WitnessedEvent {
 	eventId: string;
@@ -156,6 +159,7 @@ export interface ActorExpression {
 	targetId: string | null;
 	narrative: string | null;
 	utterance: string | null;
+	parts?: ExpressionPart[];
 	memoUpdate: CharacterMemo | null;
 }
 export interface ActorPerformance extends ActorExpression { model: string }
@@ -183,6 +187,7 @@ export interface StageEvent {
 	decision?: DecisionTrace;
 	narrative?: string;
 	utterance?: string;
+	parts?: ExpressionPart[];
 	/** Player-facing introduction captured at this event; excluded from witnessed action memory. */
 	presentation?: CharacterPresentation;
 }
@@ -230,6 +235,7 @@ export interface TurnProgress {
 	consumedInputs: number;
 	/** Wall-clock deadline for a reply to a committed NPC speech directed at the player. */
 	playerReplyUntil?: number;
+	playerReplyEventId?: string;
 	/** Missing on legacy jobs, which finish using their original FIFO order. */
 	scheduler?: ReactionSchedule;
 }
@@ -246,6 +252,7 @@ export interface GenerationJob {
 	request: PlayerRequest;
 	createdAt: string;
 	error: string | null;
+	stopReason?: 'user';
 	progress: TurnProgress | null;
 	models: ModelSelection | null;
 }

@@ -71,7 +71,7 @@ function move(world: World, actorId: string, destinationId: string, text: string
 	const scene = world.definition.scenes.find((candidate) => candidate.id === originId);
 	if (!scene?.exits.includes(destinationId)) throw new Error('현재 씬에서 이동할 수 없는 곳입니다.');
 	const destination = world.definition.scenes.find((candidate) => candidate.id === destinationId)!;
-	const departing = event(world, { sceneId: originId, kind: 'leave', actorId, targetId: null, destinationId, text, narrative: body?.narrative ?? undefined, utterance: body?.utterance ?? undefined });
+	const departing = event(world, { sceneId: originId, kind: 'leave', actorId, targetId: null, destinationId, text, narrative: body?.narrative ?? undefined, utterance: body?.utterance ?? undefined, ...(body?.parts ? { parts: structuredClone(body.parts) } : {}) });
 	reactObjects(world, departing);
 	const followers = actorId === 'player'
 		? residents(world, originId).filter((instance) => instance.companion)
@@ -113,13 +113,14 @@ export function applyAction(world: World, actorId: string, action: StageAction, 
 		if (!body) narrative = interaction.description || interaction.label;
 		Object.assign(target.state, changes);
 	}
-	const result = event(world, { sceneId: world.state.activeSceneId, kind: action.kind, actorId, targetId: action.targetId, text, interactionId: action.interactionId, changes, decision, narrative, utterance: body?.utterance ?? undefined });
+	const result = event(world, { sceneId: world.state.activeSceneId, kind: action.kind, actorId, targetId: action.targetId, text, interactionId: action.interactionId, changes, decision, narrative, utterance: body?.utterance ?? undefined, ...(body?.parts ? { parts: structuredClone(body.parts) } : {}) });
 	reactObjects(world, result);
 	return result;
 }
 
 export function availableActions(world: World, actorId: string): StageAction[] {
 	const actions: StageAction[] = [{ id: 'wait', kind: 'wait', label: '잠시 지켜본다', targetId: null }];
+	if (actorId !== 'player') actions.push({ id: 'act', kind: 'act', label: '말없이 몸짓이나 행동을 한다', targetId: null });
 	if (actorId !== 'player') actions.push({ id: 'speak:player', kind: 'speak', label: '플레이어에게 말한다', targetId: 'player' });
 	for (const instance of residents(world)) {
 		if (instance.id === actorId) continue;

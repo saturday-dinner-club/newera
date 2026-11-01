@@ -73,7 +73,7 @@ test('player action and dialogue events share one turn and preserve their roles 
 	assert.deepEqual(restored.events.map(eventContent), stage.state.events.map(eventContent));
 	assert.deepEqual(restored.instances.find(actor => actor.id === 'harin').memories, instance(stage, 'harin').memories);
 	assert.deepEqual(stage.state.instances.find(actor => actor.id === 'desk-bell').state, before.state.instances.find(actor => actor.id === 'desk-bell').state);
-	assert.ok(!availableActions(stage, 'seoyeon').some(action => action.kind === 'act'), 'free player narration does not add NPC action candidates');
+	assert.ok(availableActions(stage, 'seoyeon').some(action => action.id === 'act' && action.targetId === null), 'NPCs can choose their own silent gestures');
 });
 
 test('long player action descriptions round trip, and legacy speech remains literal without reinterpreting markers', () => {
@@ -106,6 +106,28 @@ test('player-directed speech grants five minutes before any further inference wi
 	assert.equal(result.state.tick, 1);
 	assert.equal(result.state.minute, 18 * 60 + 5, 'real-time waiting adds no game minutes');
 	assert.equal(saved.progress.playerReplyUntil, undefined);
+});
+
+test('skipping the current reply window consumes queued input first and leaves no synthetic event', async () => {
+	for (const withInput of [false, true]) {
+		let decisions = 0, skips = 0, cursor;
+		const inputs = [];
+		const result = await resolveTurn(soloWorld(), { kind: 'wait' }, {
+			async decide() { return { act: ++decisions === 1, inactivity: 'idle', model: 'fake' }; },
+			async perform() { return { actionId: 'speak:player', targetId: 'player', utterance: '함께 갈까?', narrative: null, memoUpdate: null, model: 'fake' }; }
+		}, () => {}, {
+			playerReplyTimeoutMs: 300000, now: () => 1000,
+			onProgress: (stage, progress) => { cursor = structuredClone(progress); if (withInput && progress.playerReplyUntil && !inputs.length) inputs.push({ kind: 'speak', text: '좋아.', targetId: 'seoyeon' }); },
+			nextInput: index => inputs[index] ?? null,
+			skipReply: (until, eventId) => { skips++; assert.equal(until, 301000); assert.ok(eventId); return true; },
+			wait: async () => assert.fail('skip or input must end the window immediately')
+		});
+		assert.equal(skips, withInput ? 0 : 1);
+		assert.equal(cursor.playerReplyUntil, undefined);
+		assert.equal(cursor.playerReplyEventId, undefined);
+		assert.equal(result.state.tick, withInput ? 2 : 1);
+		assert.deepEqual(result.state.events.filter(event => event.actorId === 'player').map(event => event.kind), withInput ? ['wait', 'speak'] : ['wait']);
+	}
 });
 
 test('a submitted reply ends the window immediately and is observed before the next decision', async () => {

@@ -131,7 +131,7 @@ function responseSummary(response: Fields, sanitize: (message: string) => string
 }
 function outputDiagnostic(response: Fields, stage: string, code: string, reason: string): InferenceDiagnostic {
 	const info = responseInfo.get(response);
-	const expected = info?.schema === 'actor_performance' ? ['actionId', 'targetId', 'narrative', 'utterance', 'memoUpdate'] : info?.schema === 'character_reflection' ? ['relationshipUpdates', 'memoUpdate', 'arousalUpdate'] : info?.schema === 'image_prompt' ? ['prompt'] : [];
+	const expected = info?.schema === 'actor_performance' ? ['actionId', 'targetId', 'parts', 'memoUpdate'] : info?.schema === 'character_reflection' ? ['relationshipUpdates', 'memoUpdate', 'arousalUpdate'] : info?.schema === 'image_prompt' ? ['prompt'] : [];
 	const parsed = fields(parsedOutputs.get(response));
 	const shape = expected.length && parsedOutputs.has(response) ? {
 		missingFields: expected.filter((key) => !Object.hasOwn(parsed, key)),
@@ -407,7 +407,7 @@ export async function createDirector(signal: AbortSignal, models?: ModelSelectio
 			const speakerInstructions = performanceSpeakerInstructions(self);
 			let corrections = 0;
 			let correction: string | undefined;
-			const schemaGuidance = '이전 응답이 행동 출력 계약을 지키지 못했다. actionId는 availableActions에서 고르고 targetId는 그 행동의 대상과 일치시킨다. narrative·utterance의 종류와 필수 여부, memoUpdate를 포함한 모든 필드의 형식·길이와 JSON 스키마를 지킨다.';
+			const schemaGuidance = '이전 응답이 행동 출력 계약을 지키지 못했다. actionId는 availableActions에서 고르고 targetId는 그 행동의 대상과 일치시킨다. parts는 kind(act 또는 speak)와 text만 가진 조각을 합계 1~6개로 출력한다. 표현 순서와 선택한 행동에 맞는 종류·필수 여부를 지킨다. memoUpdate를 포함한 모든 필드의 형식·길이와 JSON 스키마를 지킨다.';
 			const schema = performanceSchema(actions);
 			const systemPrompt = performanceSystemPrompt(self, writingStyle);
 			return withRetries('행동·대사 생성', settings, signal, async () => {

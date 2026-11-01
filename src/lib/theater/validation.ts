@@ -1,6 +1,7 @@
 import { inactivityModes, relationshipMetrics } from './types.ts';
 import type { CharacterReflection, ReflectionContext, ReactionProfile, Relationships, RelationshipScores, RelationshipMetric, CharacterMemo, Condition, EntityInstance, EntityMemory, EntityTemplate, EventKind, Interaction, ModelSelection, ObjectReaction, Properties, Scene, Spawn, StageEvent, Value, WorldDefinition, WorldState } from './types.ts';
 import { memoryForEvent } from './memory.ts';
+import { checkedParts, summarizeParts } from './expression-parts.ts';
 
 export function record(value: unknown, label: string): Record<string, unknown> {
 	if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label}: JSON 객체가 필요합니다.`);
@@ -230,10 +231,17 @@ export function validateState(value: unknown, definition: WorldDefinition): Worl
 			const base = { eventId: text(memory.eventId, 'memory.eventId', 160), tick: integer(memory.tick, 'memory.tick', tick) };
 			if (memory.body === undefined) return { ...base, text: text(memory.text, 'memory.text', 20000) };
 			const body = record(memory.body, 'memory.body');
+			const parts = body.parts === undefined ? undefined : checkedParts(body.parts);
+			const summary = parts ? summarizeParts(parts) : null;
+			if (summary && ((body.narrative !== undefined && body.narrative !== summary.narrative) || (body.utterance !== undefined && body.utterance !== summary.utterance))) throw new Error('기억의 표현 조각과 행동·대사 요약이 일치하지 않습니다.');
 			return {
 				...base, sceneId: identifier(memory.sceneId, 'memory.sceneId'), kind: eventKind(memory.kind),
 				actorId: identifier(memory.actorId, 'memory.actorId'), targetId: memory.targetId === null ? null : identifier(memory.targetId, 'memory.targetId'),
-				body: { narrative: body.narrative === null ? null : text(body.narrative, 'memory.body.narrative', 20000), utterance: body.utterance === null ? null : text(body.utterance, 'memory.body.utterance', 20000) },
+				body: {
+					narrative: summary ? summary.narrative : body.narrative === null ? null : text(body.narrative, 'memory.body.narrative', 20000),
+					utterance: summary ? summary.utterance : body.utterance === null ? null : text(body.utterance, 'memory.body.utterance', 20000),
+					...(parts ? { parts } : {})
+				},
 				...(memory.interactionId !== undefined ? { interactionId: identifier(memory.interactionId, 'memory.interactionId') } : {}),
 				...(memory.destinationId !== undefined ? { destinationId: identifier(memory.destinationId, 'memory.destinationId') } : {}),
 				...(memory.changes !== undefined ? { changes: properties(memory.changes, 'memory.changes') } : {})
@@ -287,6 +295,13 @@ export function validateState(value: unknown, definition: WorldDefinition): Worl
 		if (row.changes !== undefined) result.changes = properties(row.changes, 'event.changes');
 		if (row.narrative !== undefined) result.narrative = text(row.narrative, 'event.narrative', actorId === 'player' ? 4000 : 2000);
 		if (row.utterance !== undefined) result.utterance = text(row.utterance, 'event.utterance', 4000);
+		if (row.parts !== undefined) {
+			result.parts = checkedParts(row.parts);
+			const summary = summarizeParts(result.parts);
+			if ((row.narrative !== undefined && row.narrative !== summary.narrative) || (row.utterance !== undefined && row.utterance !== summary.utterance)) throw new Error('사건의 표현 조각과 행동·대사 요약이 일치하지 않습니다.');
+			result.narrative = summary.narrative ?? undefined;
+			result.utterance = summary.utterance ?? undefined;
+		}
 		if (row.presentation !== undefined) {
 			const presentation = record(row.presentation, '등장 서술');
 			if (Object.keys(presentation).some((key) => !['playerContext', 'appearance'].includes(key)) || !instances.some((actor) => actor.id === actorId && definition.templates.find((template) => template.id === actor.templateId)?.kind === 'character')) throw new Error('캐릭터의 등장 서술이 올바르지 않습니다.');

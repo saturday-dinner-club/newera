@@ -1,6 +1,6 @@
 import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { getStageView, loadWorld, resetWorld, saveWorld, selectWorld, setWorldModels, setWorldImagePreset, stopJob } from '$lib/server/stage-store';
+import { getStageView, loadWorld, resetWorld, saveWorld, selectWorld, setWorldModels, setWorldImagePreset, stopJob, skipPlayerReply } from '$lib/server/stage-store';
 import { listImagePresets } from '$lib/server/images/presets';
 import { ensureStageWorker, queueStageTurn, retryStageTurn } from '$lib/server/stage';
 import { getModelCatalog, modelSettings } from '$lib/server/oev';
@@ -18,6 +18,14 @@ function failed(error: unknown) {
 	return fail(400, { message: error instanceof Error ? error.message : '요청을 처리하지 못했습니다.' });
 }
 export const actions: Actions = {
+	continue: async ({ request }) => {
+		try {
+			const body = await request.formData();
+			skipPlayerReply(String(body.get('worldId')), String(body.get('jobId')), Number(body.get('until')), String(body.get('eventId') ?? '') || undefined);
+			ensureStageWorker();
+			return { message: '' };
+		} catch (error) { return failed(error); }
+	},
 	imagePreset: async ({ request }) => {
 		try {
 			const body = await request.formData();
@@ -52,7 +60,7 @@ export const actions: Actions = {
 			if (!catalog.models.includes(selection.decisionModel) || !catalog.models.includes(selection.textModel)) throw new Error('등록된 Provider에서 사용할 수 있는 모델을 선택해 주세요.');
 			resolveProviderSnapshot(modelSettings(), selection);
 			setWorldModels(worldId, selection);
-			return { message: '이 세션의 판단·생성 모델을 저장했습니다. 다음 새 진행 또는 이어서 재시도부터 적용됩니다.', models: selection };
+			return { message: '이 세션의 모델 설정을 저장했습니다. 다음 이야기부터 적용됩니다.', models: selection };
 		} catch (error) { return failed(error); }
 	},
 	turn: async ({ request }) => {

@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { connect, Index, type Table } from '@lancedb/lancedb';
 import { Bool, Field, FixedSizeList, Float32, List, Schema, Utf8 } from 'apache-arrow';
 import { memoryForEvent } from '$lib/theater/memory';
+import { bodyParts } from '$lib/theater/expression-parts';
 import type { WitnessedEvent, World } from '$lib/theater/types';
 import { createEmbedder, modelSettings, type Settings } from './oev';
 import { resolveProviderModel } from './providers';
@@ -60,8 +61,7 @@ function documents(world: World): MemoryDocument[] {
 		// Names aid retrieval; the canonical structured event remains the only prompt source.
 		const text = [
 			`주체: ${names.get(event.actorId) ?? event.actorId}. 대상: ${event.targetId ? names.get(event.targetId) ?? event.targetId : '없음'}. 장소: ${scenes.get(event.sceneId) ?? event.sceneId}.`,
-			memory.body.narrative ? `행동: ${memory.body.narrative}` : '',
-			memory.body.utterance ? `발언: ${memory.body.utterance}` : '',
+			...bodyParts(memory.body).map((part) => `${part.kind === 'act' ? '행동' : '발언'}: ${part.text}`),
 			memory.destinationId ? `이동 목적지: ${scenes.get(memory.destinationId) ?? memory.destinationId}` : '',
 			memory.changes ? `상태 변화: ${JSON.stringify(memory.changes)}` : ''
 		].filter(Boolean).join('\n');

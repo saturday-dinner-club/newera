@@ -87,6 +87,112 @@ async function waitJob(base, db, worldId, failure = false) {
 	assert.fail('job did not finish');
 }
 
+test('transcript combines consecutive actions and speech across turns while retaining speakers, recipients and scene boundaries', async () => {
+	const directory = scratch();
+	const running = await app(directory, 'http://127.0.0.1:9/v1');
+	const db = new DatabaseSync(join(directory, 'newera.sqlite'));
+	try {
+		const row = db.prepare('SELECT id,state_json FROM theater_worlds LIMIT 1').get();
+		const state = JSON.parse(row.state_json);
+		const event = (id, actorId, tick, text, extra = {}) => ({ id, actorId, tick, sceneId: 'lobby', kind: 'speak', targetId: null, text, ...extra });
+		state.events = [
+			event('gesture', 'player', 1, '멋쩍게 웃어 보인다.', { kind: 'act' }),
+			event('line', 'player', 2, '조장부터 뽑아볼까요?'),
+			event('reply', 'seoyeon', 3, '좋아요.', { targetId: 'player' }),
+			event('silent', 'harin', 3, '주변을 지켜본다.', { kind: 'wait' }),
+			event('redirect', 'seoyeon', 4, '함께 골라 봐요.', { targetId: 'harin' }),
+			event('all', 'seoyeon', 5, '그럼 시작하죠.'),
+			event('new-scene', 'seoyeon', 6, '이쪽으로 와요.', { sceneId: 'stage' }),
+			event('another-speaker', 'player', 7, '갈게요.', { sceneId: 'stage' })
+		];
+		state.tick = 7;
+		db.prepare('UPDATE theater_worlds SET state_json=?,revision=revision+1 WHERE id=?').run(JSON.stringify(state), row.id);
+		const page = await (await fetch(running.base)).text();
+		const articles = page.match(/<article\b[^>]*class="stage-event[^>]*>[\s\S]*?<\/article>/g) ?? [];
+		assert.equal(articles.length, 4);
+		assert.equal((articles[0].match(/class="event-byline"/g) ?? []).length, 1);
+		assert.match(articles[0], /멋쩍게 웃어 보인다\.[\s\S]*조장부터 뽑아볼까요\?/);
+		assert.match(articles[1], /나에게[\s\S]*좋아요\.[\s\S]*class="event-recipient">하린에게[\s\S]*함께 골라 봐요\.[\s\S]*class="event-recipient">모두에게[\s\S]*그럼 시작하죠\./);
+		assert.ok(!articles[1].includes('주변을 지켜본다.'));
+		assert.match(articles[2], /이쪽으로 와요\./);
+		assert.match(articles[3], /갈게요\./);
+		assert.equal((page.match(/class="transcript-scene"/g) ?? []).length, 2);
+		assert.deepEqual(JSON.parse(db.prepare('SELECT state_json FROM theater_worlds WHERE id=?').get(row.id).state_json), state, 'reading the grouped transcript does not merge persisted events');
+	} finally { await running.stop(); db.close(); }
+});
+
+test('ordered six-part expressions persist, render and export in order; silent gestures and rejected batches remain atomic', async () => {
+	const mixed = [
+		{ kind: 'act', text: '대본 모서리를 만지작거린다.' }, { kind: 'speak', text: '아직 시간은 있어요.' },
+		{ kind: 'speak', text: '조금이지만요.' }, { kind: 'act', text: '벽시계를 올려다본다.' },
+		{ kind: 'act', text: '숨을 고른다.' }, { kind: 'speak', text: '같이 기다려 주실래요?' }
+	];
+	let mode = 'mixed', performed = false;
+	const reviews = [], observations = [];
+	const model = createServer(async (request, response) => {
+		response.setHeader('content-type', 'application/json');
+		if (request.url === '/v1/models') { response.end(JSON.stringify({ data: [{ id: 'actor-model', task: 'generation' }] })); return; }
+		const chunks = []; for await (const chunk of request) chunks.push(chunk);
+		const body = JSON.parse(Buffer.concat(chunks).toString());
+		if (body.questions?.identity_check || body.questions?.performance_check) reviews.push(body.state.proposal);
+		if (replyPerformanceReview(body, response) || replyReflection(body, response)) return;
+		if (body.questions) {
+			if (body.questions.participation) observations.push(body.state);
+			response.end(participationResponse(!performed && body.state.self.id === 'seoyeon' ? 'act' : 'wait', 'idle'));
+			return;
+		}
+		assert.equal(body.response_format.json_schema.schema.properties.parts.maxItems, 6);
+		performed = true;
+		const parts = mode === 'mixed' ? mixed : mode === 'invalid' ? [...mixed, mixed[0]] : Array.from({ length: 6 }, (_, index) => ({ kind: mode === 'silent' ? 'act' : 'speak', text: `${mode === 'silent' ? '몸짓' : '대사'} ${index + 1}` }));
+		const output = { actionId: mode === 'silent' ? 'act' : 'speak:player', targetId: mode === 'silent' ? null : 'player', parts, memoUpdate: null };
+		response.end(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(output) } }] }));
+	});
+	const port = await listen(model), provider = `http://127.0.0.1:${port}/v1`, directory = scratch();
+	let running = await app(directory, provider);
+	const db = new DatabaseSync(join(directory, 'newera.sqlite'));
+	const worldId = db.prepare('SELECT id FROM theater_worlds LIMIT 1').get().id;
+	const snapshot = () => { const row = db.prepare('SELECT revision,state_json FROM theater_worlds WHERE id=?').get(worldId); return { revision: String(row.revision), state: JSON.parse(row.state_json) }; };
+	const fields = () => ({ worldId, revision: snapshot().revision });
+	try {
+		await post(running.base, 'turn', { ...fields(), kind: 'wait' });
+		await waitJob(running.base, db, worldId);
+		const first = snapshot().state, event = first.events.find(event => event.actorId === 'seoyeon');
+		assert.deepEqual(event.parts, mixed);
+		assert.equal(first.events.filter(event => event.actorId === 'seoyeon').length, 1);
+		assert.deepEqual(first.instances.find(actor => actor.id === 'harin').memories.find(memory => memory.eventId === event.id).body.parts, mixed);
+		assert.ok(reviews.length >= 2 && reviews.every(proposal => JSON.stringify(proposal.parts) === JSON.stringify(mixed)));
+		assert.ok(observations.some(state => state.recentEvents.some(event => event.body.parts?.length === 6)));
+		const page = await (await fetch(running.base)).text();
+		const transcript = page.slice(page.indexOf('class="event-thread"'));
+		let last = -1;
+		for (const part of mixed) { const next = transcript.indexOf(part.text, last + 1); assert.ok(next > last); last = next; }
+		const markdown = await (await fetch(`${running.base}/session/export?worldId=${worldId}`)).text();
+		last = -1;
+		for (const part of mixed) { const next = markdown.indexOf(part.text, last + 1); assert.ok(next > last); last = next; }
+		await post(running.base, 'save', { worldId, slot: '1' });
+		await post(running.base, 'reset', fields());
+		await post(running.base, 'load', { ...fields(), slot: '1' });
+		await running.stop(); running = await app(directory, provider);
+		assert.deepEqual((await exported(running.base, worldId)).world.state.events.find(savedEvent => savedEvent.id === event.id).parts, mixed);
+
+		mode = 'silent'; performed = false;
+		await post(running.base, 'turn', { ...fields(), kind: 'wait' });
+		await waitJob(running.base, db, worldId);
+		const silent = snapshot().state.events.at(-1);
+		assert.equal(silent.kind, 'act'); assert.equal(silent.parts.length, 6); assert.equal(silent.utterance, undefined);
+		mode = 'speech'; performed = false;
+		await post(running.base, 'turn', { ...fields(), kind: 'wait' });
+		await waitJob(running.base, db, worldId);
+		assert.ok(snapshot().state.events.at(-1).parts.every(part => part.kind === 'speak'));
+		const beforeInvalid = snapshot().state.events;
+		mode = 'invalid'; performed = false;
+		await post(running.base, 'turn', { ...fields(), kind: 'wait' });
+		await waitJob(running.base, db, worldId, true);
+		assert.deepEqual(snapshot().state.events.slice(0, beforeInvalid.length), beforeInvalid);
+		assert.equal(snapshot().state.events.length, beforeInvalid.length + 1, 'only the new player input commits; no part of the rejected NPC batch publishes');
+	} finally { await running.stop(); db.close(); model.closeAllConnections(); await new Promise(done => model.close(done)); }
+});
+
 test('player reply window blocks inference, survives restart, consumes chat first and resumes automatically on timeout', async () => {
 	let generated = 0, allowed = 1, calls = 0;
 	const model = createServer(async (request, response) => {
@@ -123,7 +229,7 @@ test('player reply window blocks inference, survives restart, consumes chat firs
 		await pause(350);
 		assert.equal(calls, before, 'even other residents must not infer while the player can reply');
 		const page = await (await fetch(running.base)).text();
-		assert.match(page, /당신의 답변을 기다립니다/);
+		assert.match(page, /당신의 이야기를 기다려요/);
 		assert.ok(!/<textarea[^>]*disabled/.test(page), 'reply input remains enabled');
 
 		await running.stop();
@@ -163,6 +269,37 @@ test('player reply window blocks inference, survives restart, consumes chat firs
 		assert.equal(state().tick, tick);
 		assert.equal(state().minute, minute);
 		assert.equal(generated, 2);
+
+		// A skip intent targets one exact question and never inserts a player event or advances game time.
+		writeFileSync(join(directory, 'models.json'), JSON.stringify({ playerReplyTimeoutMs: 300000 }));
+		allowed = 4;
+		await post(running.base, 'turn', { worldId, revision: revision(), kind: 'wait' });
+		const firstWindow = await pausedJob(), beforeSkip = structuredClone(state());
+		const skip = job => ({ worldId, jobId: job.id, until: String(job.progress.playerReplyUntil), eventId: job.progress.playerReplyEventId });
+		assert.ok(firstWindow.progress.playerReplyEventId);
+		await post(running.base, 'continue', skip(firstWindow));
+		let secondWindow;
+		for (let index = 0; index < 300; index++) {
+			const job = await latestJob(running.base, db, worldId);
+			if (job.progress?.playerReplyEventId && job.progress.playerReplyEventId !== firstWindow.progress.playerReplyEventId) { secondWindow = job; break; }
+			await pause(20);
+		}
+		assert.ok(secondWindow, 'the next question opens its own reply window');
+		await running.stop();
+		db.prepare("UPDATE theater_jobs SET heartbeat_at='2000-01-01T00:00:00.000Z' WHERE id=?").run(secondWindow.id);
+		running = await app(directory, provider, { NEWERA_PLAYER_REPLY_TIMEOUT_MS: '' });
+		await post(running.base, 'continue', skip(firstWindow));
+		await pause(350);
+		assert.equal((await latestJob(running.base, db, worldId)).progress.playerReplyEventId, secondWindow.progress.playerReplyEventId, 'a stale button cannot skip a different question after restart');
+		assert.match(await (await fetch(running.base)).text(), /지금 이어가기/);
+		await post(running.base, 'continue', skip(secondWindow));
+		const skipped = await waitJob(running.base, db, worldId);
+		assert.equal(skipped.progress.playerReplyUntil, undefined);
+		assert.equal(skipped.progress.playerReplyEventId, undefined);
+		assert.equal(state().tick, beforeSkip.tick);
+		assert.equal(state().minute, beforeSkip.minute);
+		assert.equal(state().events.filter(event => event.actorId === 'player').length, beforeSkip.events.filter(event => event.actorId === 'player').length);
+		assert.equal(generated, 4);
 
 		const beforeInvalid = state(), invalidRevision = revision();
 		await post(running.base, 'turn', { worldId, revision: invalidRevision, kind: 'input', text: '*닫히지 않은 행동', targetId: '' }, '/', true);
@@ -546,7 +683,7 @@ test('individual results are visible while the next inference is pending and res
 		const page = await (await fetch(running.base)).text();
 		assert.match(page, /서연의 확정된 대사/);
 		assert.ok(!page.includes('하린의 확정된 대사'));
-		assert.match(page, /판단 1회 · 대기 2명/);
+		assert.match(page, /이야기가 이어지고 있어요/);
 		await post(running.base, 'models', { worldId, decisionModel: 'other-model', textModel: 'other-model' });
 
 		await running.stop();
@@ -574,8 +711,8 @@ test('individual results are visible while the next inference is pending and res
 		assert.equal(failed.state.tick, 2);
 		assert.deepEqual(failed.state.events.slice(resumed.state.events.length).map((event) => event.actorId), ['player', 'seoyeon'], 'failure of a later actor must retain earlier results');
 		const failedPage = await (await fetch(running.base)).text();
-		assert.match(failedPage, /이미 확정된 말과 행동은 유지됩니다/);
-		assert.match(failedPage, /이어서 재시도/);
+		assert.match(failedPage, /지금까지의 이야기는 간직하고 있어요/);
+		assert.match(failedPage, /다시 이어가기/);
 		await post(running.base, 'models', { worldId, decisionModel: 'actor-model', textModel: 'actor-model' });
 		failHarin = false;
 		let retryStarted;
@@ -616,7 +753,7 @@ test('individual results are visible while the next inference is pending and res
 		await post(running.base, 'retry', { worldId, revision: String(snapshot().revision), jobId: staleJob.id }, '/', true);
 		assert.equal(snapshot().state.events.length, 0, 'retry must not restore a job invalidated by reset');
 		const stalePage = await (await fetch(running.base)).text();
-		assert.match(stalePage, /실패 이후 장면이 변경되어 재시도할 수 없습니다/);
+		assert.match(stalePage, /장면이 바뀌었어요/);
 		assert.ok(!stalePage.includes('action="?/retry"'));
 	} finally {
 		release(); await running.stop(); db.close(); model.closeAllConnections(); await new Promise((done) => model.close(done));
@@ -661,11 +798,15 @@ test('role-confused proposals never publish and an operator stop fences off an i
 		for (let i = 0; i < 300 && !held; i++) await pause(20);
 		assert.ok(held);
 		const active = await latestJob(running.base, db, worldId), beforeStop = snapshot();
-		assert.match(await (await fetch(running.base)).text(), /생성 중단/);
+		assert.match(await (await fetch(running.base)).text(), /잠시 멈추기/);
 		await post(running.base, 'stop', { worldId, jobId: firstJob.id }, '/', true);
 		await post(running.base, 'stop', { worldId, jobId: active.id });
 		const stopped = await waitJob(running.base, db, worldId, true);
 		assert.match(stopped.error, /사용자가 자동 생성을 중단/);
+		assert.equal(stopped.stopReason, 'user');
+		const stoppedPage = await (await fetch(running.base)).text();
+		assert.match(stoppedPage, /이야기를 잠시 멈췄어요/);
+		assert.match(stoppedPage, /이어서 진행/);
 		release(); await pause(100);
 		assert.deepEqual(snapshot(), beforeStop, 'a late accepted review cannot commit after operator stop');
 		assert.equal((await latestJob(running.base, db, worldId)).status, 'failed');
@@ -1336,7 +1477,9 @@ test('silent inactivity persists without public transcript rows across restart, 
 		assert.equal(snapshot().state.events.filter(e => e.decision?.choice === 'watch').length, 2);
 		const watchedPage = await (await fetch(running.base)).text();
 		const visibleArticles = watchedPage.match(/<article\b[^>]*class="stage-event[^>]*>[\s\S]*?<\/article>/g) ?? [];
-		assert.equal(visibleArticles.length, 2, 'player speech and deliberate waiting remain visible');
+		assert.equal(visibleArticles.length, 1, 'consecutive player speech and deliberate waiting share one group');
+		assert.match(visibleArticles[0], /안녕/);
+		assert.match(visibleArticles[0], /잠시/);
 		assert.ok(visibleArticles.every(article => !article.includes('주변을 지켜본다.')), 'passive NPC watching does not interrupt the transcript');
 		assert.ok(snapshot().state.events.filter(e => e.actorId !== 'player').every(e => e.text === '주변을 지켜본다.'));
 		await post(running.base, 'load', { ...fields(), slot: '1' });

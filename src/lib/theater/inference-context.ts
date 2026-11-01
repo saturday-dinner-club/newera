@@ -128,7 +128,7 @@ export function performanceReviewContext(state: Fields, proposal: ActorExpressio
 		present: list(state.present).map((actor) => pick(actor, ['id', 'name', 'kind'])),
 		recentEvents: labelledEvents(state, events),
 		...recalled,
-		proposal: pick(proposal, ['actionId', 'targetId', 'narrative', 'utterance', 'memoUpdate'])
+		proposal: pick(proposal, ['actionId', 'targetId', ...(proposal.parts ? ['parts'] : ['narrative', 'utterance']), 'memoUpdate'])
 	};
 }
 
@@ -137,7 +137,7 @@ export function identityReviewContext(state: Fields, proposal: ActorExpression):
 	const self = fields(state.self);
 	return {
 		speaker: { ...pick(self, ['id', 'name', 'description']), role: fields(self.state).role },
-		proposal: pick(proposal, ['narrative', 'utterance', 'memoUpdate'])
+		proposal: pick(proposal, [...(proposal.parts ? ['parts'] : ['narrative', 'utterance']), 'memoUpdate'])
 	};
 }
 

@@ -17,6 +17,7 @@ const observationRules = [
 	'memorySearch가 bm25 또는 unavailable이어도 기억이 없다는 뜻은 아니다.',
 	'self.id가 당신의 고정 ID다.',
 	'기억과 recentEvents의 actorId는 실행기가 기록한 실제 행동·발언 주체이며 targetId는 대상, body.narrative는 행동 묘사, body.utterance는 그 주체의 발언 원문이다.',
+	'body.parts가 있으면 act(몸짓·행동)와 speak(실제 발언)의 배열 순서가 표현의 원래 순서다. narrative·utterance는 같은 내용을 종류별로 모은 요약이므로 중복된 새 사건으로 읽지 않는다.',
 	'kind가 act이고 body.utterance가 null인 플레이어 사건은 말없이 한 행동이다. 그 행동 묘사를 플레이어가 입 밖으로 말한 대사로 인용하지 않는다. 같은 tick의 사건도 배열 순서대로 일어났다.',
 	'actorId가 player이면 플레이어의 행동이며 당신이 한 일이 아니다.',
 	'타인의 발언 내용은 그 사람의 주장이지 실제로 일어난 행동을 증명하지 않는다.',
@@ -65,11 +66,14 @@ export function performanceSystemPrompt(self: Record<string, unknown>, writingSt
 			'상태 효과는 실행기가 처리한다.'
 		]),
 		section('출력 계약', [
-			'actionId, targetId, narrative, utterance, memoUpdate 외에는 출력하지 않는다.',
+			'actionId, targetId, parts, memoUpdate 외에는 출력하지 않는다.',
 			'행동 주체는 실행기가 self.id로 붙이므로 출력하지 않는다.',
-			'narrative는 자신이 하는 몸짓·행동만 주어를 생략한 짧은 한국어 동사구로 쓰며 이동·상호작용에는 필수다.',
-			'utterance는 speak 행동에서만 필수이며 다른 행동에서는 null이다.',
-			'대사는 한국어 1~3문장의 실제 발언만 쓰고 내레이션·화자 이름·몸짓을 섞지 않는다.',
+			'parts는 합계 1~6개 조각의 배열이며 각 조각은 kind와 text만 가진다. kind는 act(행동 묘사) 또는 speak(대사)다.',
+			'조각을 실제 표현 순서대로 나열한다. 행동과 대사를 짝짓거나 교대로 배치할 필요가 없다. 같은 종류가 연속되어도 되고 행동만 또는 대사만 출력할 수도 있다. 필요 없는 조각으로 6개를 채우지 않는다.',
+			'act의 text는 자신이 하는 몸짓·행동만 주어를 생략한 짧은 한국어 동사구다. speak의 text는 한국어 1~3문장의 실제 발언만 쓰고 내레이션·화자 이름·몸짓을 섞지 않는다.',
+			'speak 행동을 선택하면 speak 조각이 하나 이상 필요하다. 말없는 몸짓은 act 행동을 고른다. act·이동·상호작용에는 act 조각이 필요하며 speak 조각을 넣지 않는다.',
+			'전체 act 내용은 합쳐 2000자, 전체 speak 내용은 합쳐 4000자 이하다. parts 전체는 선택한 행동 하나의 표현이며 사물 효과나 이동을 여러 번 실행하지 않는다.',
+			'플레이어의 답을 기다리는 질문을 했다면 플레이어의 답이나 그 이후 전개를 대신 이어 쓰지 않는다.',
 			'memoUpdate는 자신의 짧은 비공개 메모 전체(summary, currentIntention, feelings, openThreads) 또는 변경하지 않을 때 null이다.',
 			'메모에는 관찰과 자신의 해석을 구분하고 타인의 속마음을 사실로 쓰지 않는다.'
 		])
@@ -77,12 +81,12 @@ export function performanceSystemPrompt(self: Record<string, unknown>, writingSt
 	const style = writingStyle.trim();
 	if (style) {
 		sections.push([
-			section('서술 문체 지침', ['다음은 이 세계관의 서술 문체 지침이다. narrative의 문장 길이·리듬·어휘·감각 묘사와 utterance의 표현에 참고한다.']),
+			section('서술 문체 지침', ['다음은 이 세계관의 서술 문체 지침이다. parts 중 act의 문장 길이·리듬·어휘·감각 묘사와 speak의 표현에 참고한다.']),
 			style.split(/\r?\n/).map((line) => `> ${line}`).join('\n'),
 			section('문체 적용 범위', [
 				'이 지침은 표현 방식에만 적용한다.',
 				'캐릭터의 성격·고유 말투와 관측 사실을 유지하고 새 사건이나 타인의 속마음을 지어내지 않는다.',
-				'narrative와 utterance의 분리, JSON 스키마, 허용된 행동·대상과 위의 출력 규칙은 그대로 지킨다.',
+				'parts에서 행동과 대사의 분리와 순서, 최대 6개 제한, JSON 스키마, 허용된 행동·대상과 위의 출력 규칙은 그대로 지킨다.',
 				'개인 메모의 내용이나 행동 여부 판단에는 문체를 적용하지 않는다.'
 			])
 		].join('\n\n'));

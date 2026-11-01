@@ -1,10 +1,13 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
+	import AppearanceControl from '$lib/components/AppearanceControl.svelte';
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { actorName, residents, templateFor, interactionsFor } from '$lib/theater/runtime';
-	import { eventContent } from '$lib/theater/event-content';
+	import { eventParts } from '$lib/theater/event-content';
+	import { transcriptGroups } from '$lib/theater/transcript';
+	import { bodyParts } from '$lib/theater/expression-parts';
 	import { eventPresentations } from '$lib/theater/presentation';
 	import { inactivityLabels, relationshipMetrics } from '$lib/theater/types';
 	import { relationshipLabels } from '$lib/theater/reflection';
@@ -24,10 +27,16 @@
 	let resetError = $state('');
 	let historyElement = $state<HTMLDivElement>();
 	let objectsOpen = $state(true);
+	let catalogOpen = $state(false);
+	let actionsOpen = $state(false);
+	let menuOpen = $state(false);
+	let narrowLayout = $state(false);
+	let hasNewEvents = $state(false);
+	let followingHistory = true;
 	let showEventDetails = $state(false);
 	let scrollContext = '';
 	let scrollVersion = 0;
-	let followingHistory = true;
+	let observedOutput = '';
 	let world = $derived(data.world);
 	let scene = $derived(world.definition.scenes.find((entry) => entry.id === world.state.activeSceneId)!);
 	let present = $derived(residents(world));
@@ -46,6 +55,7 @@
 	});
 	let busy = $derived(submitting || generating);
 	let events = $derived(world.state.events.slice(-100));
+	let transcript = $derived(transcriptGroups(events));
 	let eventsById = $derived(new Map(world.state.events.map((event) => [event.id, event])));
 	let presentations = $derived(eventPresentations(world));
 	let illustrationRevision = $derived(JSON.stringify(data.illustrations.map((entry) => [entry.id, entry.status])));
@@ -66,17 +76,21 @@
 		// Measure before new output grows the scroll range; measuring afterward would disable following.
 		const follow = scrollContext !== world.id || nearHistoryEnd(element);
 		const previousTop = element.scrollTop;
+		const output = JSON.stringify([events.map(event => event.id), data.illustrations.filter(entry => entry.status === 'completed').map(entry => entry.id)]);
+		if (!follow && output !== observedOutput) hasNewEvents = true;
+		observedOutput = output;
 		const version = ++scrollVersion;
 		scrollContext = world.id;
 		void tick().then(() => {
 			if (version !== scrollVersion || historyElement !== element) return;
 			element.scrollTop = follow ? element.scrollHeight : previousTop;
 			followingHistory = nearHistoryEnd(element);
+			if (followingHistory) hasNewEvents = false;
 		});
 	});
 	onMount(() => {
 		const narrow = window.matchMedia('(max-width: 900px)');
-		const resizeObjects = () => { objectsOpen = !narrow.matches; };
+		const resizeObjects = () => { narrowLayout = narrow.matches; objectsOpen = !narrow.matches; catalogOpen = false; };
 		resizeObjects();
 		narrow.addEventListener('change', resizeObjects);
 		const element = historyElement!;
@@ -85,6 +99,24 @@
 		});
 		resizeHistory.observe(element);
 		return () => { narrow.removeEventListener('change', resizeObjects); resizeHistory.disconnect(); };
+	});
+	$effect(() => {
+		if (!narrowLayout || (!catalogOpen && !objectsOpen)) return;
+		const active = document.activeElement as HTMLElement | null;
+		const drawer = document.querySelector<HTMLElement>(catalogOpen ? '.catalog' : '.objects-panel');
+		const reader = document.querySelector<HTMLElement>('.stage-reader');
+		const header = document.querySelector<HTMLElement>('.topbar');
+		if (!drawer) return;
+		if (reader) reader.inert = true;
+		if (header) header.inert = true;
+		const focusables = () => Array.from(drawer.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input:not([type=hidden]), select, textarea, summary')).filter(node => node.getClientRects().length > 0);
+		void tick().then(() => focusables()[0]?.focus());
+		const keys = (event: KeyboardEvent) => {
+			if (event.key === 'Escape') { catalogOpen = false; objectsOpen = false; }
+			if (event.key === 'Tab') { const items = focusables(); const first = items[0], last = items.at(-1); if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); } }
+		};
+		document.addEventListener('keydown', keys);
+		return () => { if (reader) reader.inert = false; if (header) header.inert = false; document.removeEventListener('keydown', keys); if (active?.isConnected) active.focus(); };
 	});
 	let modelCatalog = $state<{ models: string[]; defaults: ModelSelection; options: ModelOption[]; errors: string[] } | null>(null);
 	let providerManagerOpen = $state(false);
@@ -197,25 +229,31 @@
 <header class="topbar">
  <a class="brand" href="/">newera<span>THEATER</span></a>
  <nav class="session-actions" aria-label="세션 관리">
-  <button type="button" onclick={() => { modelsDialog?.showModal(); if (!modelCatalog) void loadModels(); }}>모델 설정</button>
-  <button type="button" onclick={() => { resetError = ''; resetDialog?.showModal(); }}>처음부터 다시</button>
-  <a class="top-link" href="/lores">세계관과 무대 편집 ↗</a>
+  <a class="top-link desktop-link" href="/lores">작업실</a><a class="top-link desktop-link" href="/images">삽화</a>
+  <AppearanceControl />
+  <details class="session-menu" bind:open={menuOpen}><summary>메뉴</summary><div class="menu-popover">
+   <button type="button" onclick={() => { menuOpen = false; catalogOpen = true; }}>세계관 · 저장 슬롯</button>
+   <button type="button" onclick={() => { menuOpen = false; modelsDialog?.showModal(); if (!modelCatalog) void loadModels(); }}>모델과 삽화 설정</button>
+   <a href="/lores">이야기 작업실</a><a href="/images">삽화 프리셋</a>
+   <a href={`/session/export?worldId=${encodeURIComponent(world.id)}`}>공연 기록 내려받기</a>
+   <button type="button" onclick={() => { menuOpen = false; resetError = ''; resetDialog?.showModal(); }}>처음부터 다시</button>
+  </div></details>
  </nav>
 </header>
 <dialog class="session-dialog" aria-labelledby="models-dialog-title" bind:this={modelsDialog}>
  <form method="dialog" class="dialog-close"><button aria-label="모델 설정 닫기">닫기</button></form>
 		<div class="model-settings">
 			<h2 id="models-dialog-title">이 세션의 모델 설정</h2>
-			<small>판단: {modelLabel(world.models?.decisionModel ?? modelCatalog?.defaults.decisionModel ?? '기본 설정')} · 생성: {modelLabel(world.models?.textModel ?? modelCatalog?.defaults.textModel ?? '기본 설정')}</small>
+			<small>반응: {modelLabel(world.models?.decisionModel ?? modelCatalog?.defaults.decisionModel ?? '기본 설정')} · 문장: {modelLabel(world.models?.textModel ?? modelCatalog?.defaults.textModel ?? '기본 설정')}</small>
 			<p>현재 세계관의 다음 새 진행 또는 이어서 재시도부터 적용됩니다. 진행 중인 작업은 시작할 때 선택한 모델을 유지합니다.</p>
 			<form method="POST" action="?/models" use:enhance={submitModels} class="model-form">
 				<input type="hidden" name="worldId" value={world.id} />
-				<label>판단 모델<select name="decisionModel" bind:value={decisionModel} disabled={modelsLoading || modelsSaving || !modelCatalog} required>
+				<label>반응 모델<select name="decisionModel" bind:value={decisionModel} disabled={modelsLoading || modelsSaving || !modelCatalog} required>
 					<option value="">{modelsLoading ? '목록을 불러오는 중…' : '모델을 선택하세요'}</option>
 					{#if decisionModel && !modelCatalog?.models.includes(decisionModel)}<option value={decisionModel} disabled>{decisionModel} (목록에 없음)</option>{/if}
 					{#each modelCatalog?.options.filter((entry) => entry.decision) ?? [] as option}<option value={option.value}>{option.providerLabel} / {option.label}</option>{/each}
 				</select></label>
-				<label>생성 모델<select name="textModel" bind:value={textModel} disabled={modelsLoading || modelsSaving || !modelCatalog} required>
+				<label>문장 모델<select name="textModel" bind:value={textModel} disabled={modelsLoading || modelsSaving || !modelCatalog} required>
 					<option value="">{modelsLoading ? '목록을 불러오는 중…' : '모델을 선택하세요'}</option>
 					{#if textModel && !modelCatalog?.models.includes(textModel)}<option value={textModel} disabled>{textModel} (목록에 없음)</option>{/if}
 					{#each modelCatalog?.options ?? [] as option}<option value={option.value}>{option.providerLabel} / {option.label}</option>{/each}
@@ -234,7 +272,7 @@
  <h2 id="reset-dialog-title">처음부터 다시</h2>
  <p>현재 세계관의 진행·대화·기억·삽화 기록을 지우고 초기 배치로 돌아갑니다. 저장 슬롯과 모델·이미지 설정은 유지됩니다.</p>
  <a class="session-export" href={`/session/export?worldId=${encodeURIComponent(world.id)}`}>초기화 전에 공연 기록 내려받기</a>
- {#if generating}<p>생성 중에는 먼저 「생성 중단」을 눌러 주세요.</p>{/if}
+ {#if generating}<p>이야기가 이어지는 동안에는 먼저 「잠시 멈추기」를 눌러 주세요.</p>{/if}
  <form method="POST" action="?/reset" use:enhance={submitReset} class="reset-form">
   <input type="hidden" name="worldId" value={world.id} />
   <input type="hidden" name="revision" value={world.revision} />
@@ -242,19 +280,20 @@
  </form>
  {#if resetError}<p class="feedback error" role="alert">{resetError}</p>{/if}
 </dialog>
+{#if catalogOpen || objectsOpen}<button class="drawer-backdrop" aria-label="주변 창 닫기" onclick={() => { catalogOpen = false; objectsOpen = false; }}></button>{/if}
 <div class="theater-layout">
-	<aside class="catalog">
-		<p class="eyebrow">WORLDS</p>
+	<aside class="catalog" class:drawer-open={catalogOpen} aria-label="세계관과 저장 슬롯"><button class="drawer-close" onclick={() => { catalogOpen = false; }}>세계관 닫기</button>
+		<p class="eyebrow">세계관</p>
 		{#each data.worlds as entry}
 			<form method="POST" action="?/selectWorld" use:enhance>
 				<input type="hidden" name="worldId" value={entry.id} />
 				<button class:current={entry.id === world.id} class="world-link" disabled={entry.id === world.id}>{entry.name}</button>
 			</form>
 		{/each}
-		<div class="sidebar-section"><p class="eyebrow">COMPANIONS</p>
+		<div class="sidebar-section"><p class="eyebrow">동행</p>
 			{#each companions as instance}<p class="companion-name">{instance.name}<small>함께 이동하는 동행</small></p>{:else}<p class="muted">아직 동행이 없습니다.</p>{/each}
 		</div>
-		<div class="sidebar-section"><p class="eyebrow">SAVE SLOTS</p>
+		<div class="sidebar-section"><p class="eyebrow">저장 슬롯</p>
 			{#each [1, 2, 3] as slot}
 				{@const save = data.saves.find((entry) => entry.slot === slot)}
 				<div class="save-slot"><span>{slot} · {save ? `${save.tick}회 진행` : '비어 있음'}</span><div class="button-row">
@@ -265,9 +304,9 @@
 		</div>
 	</aside>
 	<main class="stage-reader">
-		<div class="scene-heading"><div><p class="eyebrow">SCENE / {world.state.tick}</p><h1>{scene.name}</h1></div><span>{world.state.day}일차 · {clock(world.state.minute)}</span></div>
+		<div class="scene-heading"><div><p class="eyebrow">SCENE / {world.state.tick}</p><h1>{scene.name}</h1></div><div class="scene-heading-meta"><span>{world.state.day}일차 · {clock(world.state.minute)}</span><button class="context-trigger" type="button" onclick={() => { objectsOpen = !objectsOpen; }}>주변 <span>{objects.length}</span></button></div></div>
 		<!-- svelte-ignore a11y_no_noninteractive_tabindex (The scrollable history region needs keyboard focus for PageUp and PageDown.) -->
-		<div class="history-scroll" role="region" aria-label="대화 기록" tabindex="0" bind:this={historyElement} onscroll={() => { if (historyElement) followingHistory = nearHistoryEnd(historyElement); }}>
+		<div class="history-scroll" role="region" aria-label="대화 기록" tabindex="0" bind:this={historyElement} onscroll={() => { if (historyElement) { followingHistory = nearHistoryEnd(historyElement); if (followingHistory) hasNewEvents = false; } }}>
 		<p class="scene-description">{scene.description}</p>
 		<div class="cast-strip" aria-label="현재 씬의 등장인물">
 			{#each characters as instance}<span class:companion={instance.companion}>{instance.name}{instance.companion ? ' · 동행' : ''}</span>{:else}<span>지금 이곳에는 나 혼자 있다.</span>{/each}
@@ -291,8 +330,7 @@
 					{@const witnessed = event ? memoryForEvent(event) : 'body' in memory ? memory : null}
 					<li>{#if witnessed}
 						<strong>{witnessed.actorId === 'player' ? '플레이어' : actorName(world, witnessed.actorId)}</strong>{#if witnessed.targetId} → {actorName(world, witnessed.targetId)}{/if}
-						{#if witnessed.body.narrative}<p>행동: {witnessed.body.narrative}</p>{/if}
-						{#if witnessed.body.utterance}<p>대사: {witnessed.body.utterance}</p>{/if}
+						{#each bodyParts(witnessed.body) as part}<p>{part.kind === 'act' ? '행동' : '대사'}: {part.text}</p>{/each}
 					{:else if 'text' in memory}이전 기록 (주체 미확인): {memory.text}{/if}</li>
 				{:else}<li>아직 기억한 사건이 없습니다.</li>{/each}</ul>
 			{/each}
@@ -300,64 +338,59 @@
 
 		</div>
 		<div class="event-thread" aria-live="polite">
-			{#each events as event, index (event.id)}
-				{@const eventScene = world.definition.scenes.find((entry) => entry.id === event.sceneId)}
-				{@const content = eventContent(event)}
-				{@const presentation = presentations.get(event.id)}
-				{#if event.kind !== 'wait' || event.actorId === 'player'}
-					{#if index === 0 || events[index - 1].sceneId !== event.sceneId}
-						<h2 class="transcript-scene">{eventScene?.name ?? '무대'}</h2>
-					{/if}
-					<article class="stage-event" class:player={event.actorId === 'player'} class:dialogue={event.kind === 'speak'}>
-						<div class="event-byline"><strong>{actorName(world, event.actorId)}</strong>{#if event.targetId}<span>{actorName(world, event.targetId)}에게</span>{/if}</div>
-						{#if presentation}<CharacterIntroduction {presentation} characterId={event.actorId} />{/if}
-						{#if content.narrative}<p class="event-action">{content.narrative}</p>{/if}
-						{#if content.utterance}<p class="event-speech"><q>{content.utterance}</q></p>{/if}
-						{#if showEventDetails}
-							<div class="event-metadata">
-								<small>{eventScene?.name} · {event.tick}회</small>
-								{#if event.changes && Object.keys(event.changes).length}<small class="state-change">{Object.entries(event.changes).map(([key, value]) => `${key}: ${value}`).join(' · ')}</small>{/if}
-								{#if event.decision}<details class="decision-detail"><summary>선택 기록</summary><small>{event.decision.acted === undefined ? '이전 판단' : event.decision.acted ? '행동한다' : '지켜본다'} · {event.decision.choice} · 판단 {event.decision.model}{#if event.decision.generationModel} · 생성 {event.decision.generationModel}{/if}</small></details>{/if}
-							</div>
-						{/if}
+			{#each transcript as group (group.id)}
+				{@const first = group.firstEvent}
+				{@const eventScene = world.definition.scenes.find((entry) => entry.id === group.sceneId)}
+				{#if first}
+					{#if group.startsScene}<h2 class="transcript-scene">{eventScene?.name ?? '무대'}</h2>{/if}
+					<article class="stage-event" class:player={first.actorId === 'player'} class:dialogue={group.entries.some(entry => entry.visible && entry.event.kind === 'speak')}>
+						<div class="event-byline"><strong>{actorName(world, first.actorId)}</strong>{#if first.targetId}<span>{actorName(world, first.targetId)}에게</span>{/if}</div>
+						{#each group.entries as entry (entry.event.id)}
+							{@const event = entry.event}
+							{#if entry.visible}
+								{@const presentation = presentations.get(event.id)}
+								{#if entry.targetChanged}<div class="event-recipient">{event.targetId ? `${actorName(world, event.targetId)}에게` : '모두에게'}</div>{/if}
+								{#if presentation}<CharacterIntroduction {presentation} characterId={event.actorId} />{/if}
+								{#each eventParts(event) as part}
+									{#if part.kind === 'act'}<p class="event-action">{part.text}</p>{:else}<p class="event-speech"><q>{part.text}</q></p>{/if}
+								{/each}
+								{#if showEventDetails}
+									<div class="event-metadata">
+										<small>{eventScene?.name} · {event.tick}회</small>
+										{#if event.changes && Object.keys(event.changes).length}<small class="state-change">{Object.entries(event.changes).map(([key, value]) => `${key}: ${value}`).join(' · ')}</small>{/if}
+										{#if event.decision}<details class="decision-detail"><summary>선택 기록</summary><small>{event.decision.acted === undefined ? '이전 판단' : event.decision.acted ? '행동한다' : '지켜본다'} · {event.decision.choice} · 판단 {event.decision.model}{#if event.decision.generationModel} · 생성 {event.decision.generationModel}{/if}</small></details>{/if}
+									</div>
+								{/if}
+							{/if}
+							{#each illustrationsByEvent.get(event.id) ?? [] as illustration (illustration.id)}<IllustrationCard {illustration} onImageLoad={followIllustration} />{/each}
+						{/each}
 					</article>
+				{:else}
+					{#each group.entries as entry (entry.event.id)}
+						{#each illustrationsByEvent.get(entry.event.id) ?? [] as illustration (illustration.id)}<IllustrationCard {illustration} onImageLoad={followIllustration} />{/each}
+					{/each}
 				{/if}
-				{#each illustrationsByEvent.get(event.id) ?? [] as illustration (illustration.id)}<IllustrationCard {illustration} onImageLoad={followIllustration} />{/each}
 			{:else}<div class="empty-stage"><p>아직 아무도 말을 꺼내지 않았다.</p><span>말을 걸거나, 주변 사물을 살피거나, 잠시 기다려 보세요.</span></div>{/each}
 			{#each otherIllustrations as illustration (illustration.id)}<IllustrationCard {illustration} onImageLoad={followIllustration} />{/each}
 		</div>
-		{#if generating}
-			<div class="generation-status">
-				<p role="status">{#if playerReplyUntil !== undefined}당신의 답변을 기다립니다. 아래에 행동이나 대사를 입력해 주세요. 입력이 없으면 {replySeconds}초 후 자동으로 이어집니다.{:else}현장의 인물들이 각자의 다음 행동을 고르고 있습니다…{#if data.generation?.progress} (판단 {data.generation.progress.completedDecisions}회 · 대기 {data.generation.progress.pendingActorIds.length}명){/if}{/if}</p>
-				<form method="POST" action="?/stop" use:enhance={submitRetry}>
-					<input type="hidden" name="worldId" value={world.id} />
-					<input type="hidden" name="jobId" value={data.generation!.id} />
-					<button disabled={submitting}>생성 중단</button>
-				</form>
-			</div>
-		{/if}
-		{#if data.generation?.status === 'failed'}
-			<div class="feedback error generation-error">
-				<p role="alert">{data.generation.error} 이미 확정된 말과 행동은 유지됩니다.</p>
-				{#if data.generation.revision === world.revision}
-					<form method="POST" action="?/retry" use:enhance={submitRetry}>
-						<input type="hidden" name="worldId" value={world.id} />
-						<input type="hidden" name="revision" value={world.revision} />
-						<input type="hidden" name="jobId" value={data.generation.id} />
-						<button disabled={busy}>{submitting ? '재시도 요청 중…' : '이어서 재시도'}</button>
-						<small>실패한 지점부터 현재 적용된 판단·생성 모델로 다시 진행합니다.</small>
-					</form>
-				{:else}<small>실패 이후 장면이 변경되어 재시도할 수 없습니다. 새 말이나 행동으로 진행해 주세요.</small>{/if}
-			</div>
-		{/if}
-		{#if form?.message}<p class="feedback" role="status">{form.message}</p>{/if}
+
 		</div>
-		<section class="player-console"><p class="eyebrow">{#if playerReplyUntil !== undefined}당신이 답할 차례 · {replySeconds}초 남음{:else}YOUR NEXT LINE{/if}</p>
+		<section class="player-console" aria-label="나의 차례">
+			{#if hasNewEvents}<button class="latest-story" type="button" onclick={() => { if (historyElement) historyElement.scrollTop = historyElement.scrollHeight; hasNewEvents = false; }}>새 이야기 ↓</button>{/if}
+			<div class="turn-status" class:reply-waiting={playerReplyUntil !== undefined}>
+				<p role="status">{#if playerReplyUntil !== undefined}당신의 이야기를 기다려요{:else if generating}이야기가 이어지고 있어요{:else if data.generation?.stopReason === 'user'}이야기를 잠시 멈췄어요{:else if data.generation?.status === 'failed'}잠시 이야기를 이어가지 못했어요{:else}다음 이야기를 들려주세요{/if}</p>
+				{#if playerReplyUntil !== undefined}<time aria-label={`답변까지 ${replySeconds}초 남음`}>{clock(replySeconds)}</time><form method="POST" action="?/continue" use:enhance={submitRetry}><input type="hidden" name="worldId" value={world.id} /><input type="hidden" name="jobId" value={data.generation!.id} /><input type="hidden" name="until" value={playerReplyUntil} /><input type="hidden" name="eventId" value={data.generation?.progress?.playerReplyEventId ?? ''} /><button disabled={submitting}>지금 이어가기</button></form>
+				{:else if generating}<form method="POST" action="?/stop" use:enhance={submitRetry}><input type="hidden" name="worldId" value={world.id} /><input type="hidden" name="jobId" value={data.generation!.id} /><button disabled={submitting}>잠시 멈추기</button></form>
+				{:else if data.generation?.status === 'failed' && data.generation.revision === world.revision}<form method="POST" action="?/retry" use:enhance={submitRetry}><input type="hidden" name="worldId" value={world.id} /><input type="hidden" name="revision" value={world.revision} /><input type="hidden" name="jobId" value={data.generation.id} /><button disabled={busy}>{data.generation.stopReason === 'user' ? '이어서 진행' : '다시 이어가기'}</button></form>{/if}
+			</div>
+			{#if data.generation?.status === 'failed' && data.generation.stopReason !== 'user'}<details class="problem-details"><summary>지금까지의 이야기는 간직하고 있어요 · 문제 상세</summary><p>{data.generation.error}</p></details>{/if}
+			{#if data.generation?.status === 'failed' && data.generation.revision !== world.revision}<p class="console-feedback">장면이 바뀌었어요. 새 말이나 행동으로 이야기를 이어 주세요.</p>{/if}
+			{#if form?.message}<p class="console-feedback" role="status">{form.message}</p>{/if}
 			<form method="POST" action="?/turn" use:enhance={submitTurn} class="speech-form">
 				<input type="hidden" name="worldId" value={world.id} /><input type="hidden" name="revision" value={world.revision} /><input type="hidden" name="kind" value="input" />
 				{#if characters.length < 8}
 					<fieldset class="recipient-picker" disabled={submitting}>
-						<legend>누구에게</legend>
+						<legend class="sr-only">누구에게</legend>
 						<div class="recipient-tags">
 							<label class="recipient-tag"><input type="radio" name="targetId" value="" bind:group={targetId} /><span>모두에게</span></label>
 							{#each characters as instance (instance.id)}<label class="recipient-tag"><input type="radio" name="targetId" value={instance.id} bind:group={targetId} /><span>{instance.name}</span></label>{/each}
@@ -366,18 +399,19 @@
 				{:else}
 					<label class="recipient-dropdown">누구에게<select name="targetId" bind:value={targetId} disabled={submitting}><option value="">현장에 있는 모두에게</option>{#each characters as instance}<option value={instance.id}>{instance.name}</option>{/each}</select></label>
 				{/if}
-				<label class="speech-input">나의 행동과 대사<textarea name="text" rows="2" placeholder={'*고개를 끄덕인다* "좋아요. 함께 가요."'} aria-describedby="player-input-help" maxlength="4000" required disabled={submitting}></textarea><small id="player-input-help">*행동*과 "대사"를 순서대로 적어 주세요. 표기 없는 문장은 대사로 처리합니다.</small></label>
+				<label class="speech-input"><span class="sr-only">나의 행동과 대사</span><textarea name="text" rows="1" placeholder={'*고개를 끄덕인다* "좋아요. 함께 가요."'} aria-describedby="player-input-help" maxlength="4000" required disabled={submitting}></textarea></label>
 				<button class="primary" disabled={submitting}>보내기</button>
 			</form>
-			<div class="stage-options">
+			<div class="console-tools"><details class="input-help"><summary>입력 도움말</summary><p id="player-input-help">*행동*과 "대사"를 순서대로 적어 주세요. 표기 없는 문장은 대사로 처리합니다. 예: *고개를 끄덕인다* "좋아요."</p></details><button type="button" onclick={() => { actionsOpen = !actionsOpen; }} aria-expanded={actionsOpen}>행동 · 이동 {actionsOpen ? "접기" : "열기"}</button></div>
+			<div class="stage-options console-actions" class:actions-open={actionsOpen}>
 				<form method="POST" action="?/turn" use:enhance={submitTurn}><input type="hidden" name="worldId" value={world.id} /><input type="hidden" name="revision" value={world.revision} /><button name="kind" value="wait" disabled={busy}>잠시 지켜본다</button></form>
 				{#each scene.exits as exit}{@const destination = world.definition.scenes.find((entry) => entry.id === exit)!}<form method="POST" action="?/turn" use:enhance={submitTurn}><input type="hidden" name="worldId" value={world.id} /><input type="hidden" name="revision" value={world.revision} /><input type="hidden" name="kind" value="move" /><button name="destinationId" value={exit} disabled={busy}>{destination.name}(으)로 →</button></form>{/each}
 			</div>
 		</section>
 
 	</main>
-	<aside class="objects-panel" aria-label="현재 씬의 상호작용 오브젝트"><details class="objects-drawer" bind:open={objectsOpen}><summary>주변 사물 <span>{objects.length}</span></summary><div class="objects-content"><p class="eyebrow">ON THE SCENE</p><h2>주변 사물</h2><p class="objects-location">{scene.name}</p><div class="object-grid">
-		{#each objects as instance (instance.id)}<article class="object-card"><h3>{instance.name}</h3><p>{templateFor(world, instance).description}</p><small>{Object.entries(instance.state).map(([key, value]) => `${key}: ${value}`).join(' · ')}</small><div class="stage-options">
+	<aside class="objects-panel" class:drawer-open={objectsOpen} aria-label="현재 씬의 상호작용 오브젝트"><details class="objects-drawer" bind:open={objectsOpen}><summary>주변 사물 <span>{objects.length}</span></summary><div class="objects-content"><button class="drawer-close" type="button" onclick={() => { objectsOpen = false; }}>주변 닫기</button><p class="eyebrow">ON THE SCENE</p><h2>주변 사물</h2><p class="objects-location">{scene.name}</p><div class="object-grid">
+		{#each objects as instance (instance.id)}<article class="object-card"><h3>{instance.name}</h3><p>{templateFor(world, instance).description}</p><details class="object-state-details"><summary>사물 상태</summary><small>{Object.entries(instance.state).map(([key, value]) => `${key}: ${value}`).join(' · ')}</small></details><div class="stage-options">
 			{#each interactionsFor(world, instance) as interaction}<form method="POST" action="?/turn" use:enhance={submitTurn}><input type="hidden" name="worldId" value={world.id} /><input type="hidden" name="revision" value={world.revision} /><input type="hidden" name="kind" value="interact" /><input type="hidden" name="targetId" value={instance.id} /><button name="interactionId" value={interaction.id} disabled={busy}>{interaction.label}</button></form>{/each}
 		</div></article>{:else}<p class="muted">지금 이곳에는 살펴볼 사물이 없습니다.</p>{/each}
 	</div></div></details></aside>

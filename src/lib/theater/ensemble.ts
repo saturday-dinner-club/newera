@@ -1,6 +1,7 @@
 import { applyAction, availableActions, beginTurn, observation, residents, templateFor } from './runtime.ts';
 import { checkedExpression, isExactRepeat } from './performance.ts';
 import { memoryForEvent } from './memory.ts';
+import { bodyParts } from './expression-parts.ts';
 import { applyReflection, reflectionContext } from './reflection.ts';
 import { applyAppearance, needsAppearance } from './appearance.ts';
 import { inactivityModes } from './types.ts';
@@ -21,6 +22,7 @@ interface TurnExecution {
 	nextInput?: (consumedInputs: number) => PlayerRequest | null;
 	/** Live hosts enable a reply window; headless simulations do not wait by default. */
 	playerReplyTimeoutMs?: number;
+	skipReply?: (until: number, eventId?: string) => boolean;
 	now?: () => number;
 	wait?: (ms: number) => Promise<void>;
 }
@@ -59,6 +61,7 @@ export async function resolveTurn(original: World, request: PlayerRequest, direc
 		const input = execution.nextInput?.(progress.consumedInputs);
 		if (input) {
 			delete progress.playerReplyUntil;
+			delete progress.playerReplyEventId;
 			beginTurn(draft, input);
 			progress.consumedInputs++;
 			const targetId = input.kind === 'input' || input.kind === 'speak' || input.kind === 'interact' ? input.targetId : null;
@@ -74,11 +77,12 @@ export async function resolveTurn(original: World, request: PlayerRequest, direc
 		// No reflection, scheduling or generation may overtake the player's reply window.
 		if (progress.playerReplyUntil !== undefined) {
 			const remaining = progress.playerReplyUntil - now();
-			if (remaining > 0) {
+			if (remaining > 0 && !execution.skipReply?.(progress.playerReplyUntil, progress.playerReplyEventId)) {
 				await wait(Math.min(250, remaining));
 				continue;
 			}
 			delete progress.playerReplyUntil;
+			delete progress.playerReplyEventId;
 			execution.onProgress?.(draft, progress);
 			continue;
 		}
@@ -175,7 +179,7 @@ export async function resolveTurn(original: World, request: PlayerRequest, direc
 				}
 			} else {
 				const candidates = actions.filter((action) => action.kind !== 'wait');
-				const previous = draft.state.events.findLast((event) => event.actorId === actor.id && ['speak', 'interact', 'leave', 'move'].includes(event.kind));
+				const previous = draft.state.events.findLast((event) => event.actorId === actor.id && ['act', 'speak', 'interact', 'leave', 'move'].includes(event.kind));
 				const previousAction = previous ? memoryForEvent(previous) : undefined;
 				let performance: ActorPerformance;
 				try { performance = await director.perform(state, candidates, draft.definition.writingStyle, previousAction); }
@@ -192,7 +196,7 @@ export async function resolveTurn(original: World, request: PlayerRequest, direc
 				if (isExactRepeat(previousAction, actor.id, actor.sceneId, action, expression)) {
 					actor.inactivity = { mode: 'idle', tick: draft.state.tick, model: decision.model };
 				} else {
-					const text = [expression.narrative, expression.utterance].filter(Boolean).join('\n') || action.label;
+						const text = bodyParts(expression).map((part) => part.text).join('\n') || action.label;
 					applyAction(draft, actor.id, action, text, { model: decision.model, choice: action.id, acted: true, generationModel: model }, expression);
 					delete actor.inactivity;
 					if (expression.memoUpdate) actor.memo = expression.memoUpdate;
@@ -214,8 +218,10 @@ export async function resolveTurn(original: World, request: PlayerRequest, direc
 		if (cast.includes(actorId) && emitted.some((event) => event.actorId === actorId) && !progress.pendingActorIds.includes(actorId)) {
 			progress.pendingActorIds.push(actorId);
 		}
-		if (playerReplyTimeoutMs > 0 && emitted.some((event) => event.kind === 'speak' && event.actorId !== 'player' && event.targetId === 'player')) {
+		const replyEvent = emitted.find((event) => event.kind === 'speak' && event.actorId !== 'player' && event.targetId === 'player');
+		if (playerReplyTimeoutMs > 0 && replyEvent) {
 			progress.playerReplyUntil = now() + playerReplyTimeoutMs;
+			progress.playerReplyEventId = replyEvent.id;
 		}
 		checkpoint();
 		execution.onProgress?.(draft, progress);

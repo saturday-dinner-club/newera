@@ -56,6 +56,8 @@ export function store(): DatabaseSync {
 	if (!(db.prepare('PRAGMA table_info(theater_jobs)').all() as Row[]).some((column) => column.name === 'models_json')) db.exec('ALTER TABLE theater_jobs ADD COLUMN models_json TEXT');
 	if (!(db.prepare('PRAGMA table_info(theater_jobs)').all() as Row[]).some((column) => column.name === 'providers_json')) db.exec('ALTER TABLE theater_jobs ADD COLUMN providers_json TEXT');
 	if (!(db.prepare('PRAGMA table_info(theater_jobs)').all() as Row[]).some((column) => column.name === 'inputs_json')) db.exec('ALTER TABLE theater_jobs ADD COLUMN inputs_json TEXT');
+	if (!(db.prepare('PRAGMA table_info(theater_jobs)').all() as Row[]).some((column) => column.name === 'reply_skip_key')) db.exec('ALTER TABLE theater_jobs ADD COLUMN reply_skip_key TEXT');
+	if (!(db.prepare('PRAGMA table_info(theater_jobs)').all() as Row[]).some((column) => column.name === 'stop_reason')) db.exec('ALTER TABLE theater_jobs ADD COLUMN stop_reason TEXT');
 	if (!(db.prepare('PRAGMA table_info(theater_worlds)').all() as Row[]).some((column) => column.name === 'model_settings_json')) db.exec('ALTER TABLE theater_worlds ADD COLUMN model_settings_json TEXT');
 	if (!(db.prepare('PRAGMA table_info(theater_worlds)').all() as Row[]).some((column) => column.name === 'image_preset_id')) db.exec('ALTER TABLE theater_worlds ADD COLUMN image_preset_id TEXT REFERENCES theater_image_presets(id)');
 	database = db;
@@ -317,7 +319,7 @@ export function importWorld(raw: string, replace?: { worldId: string; revision: 
 }
 
 function jobFromRow(row: Row): GenerationJob {
-	return { id: String(row.id), worldId: String(row.world_id), revision: Number(row.revision), status: row.status as GenerationJob['status'], request: JSON.parse(String(row.request_json)), createdAt: String(row.created_at), error: row.error === null ? null : String(row.error), progress: restoredProgress(row.progress_json ? JSON.parse(String(row.progress_json)) : null), models: row.models_json ? checkedModelSelection(JSON.parse(String(row.models_json))) : null };
+	return { id: String(row.id), worldId: String(row.world_id), revision: Number(row.revision), status: row.status as GenerationJob['status'], request: JSON.parse(String(row.request_json)), createdAt: String(row.created_at), error: row.error === null ? null : String(row.error), ...(row.stop_reason === 'user' ? { stopReason: 'user' as const } : {}), progress: restoredProgress(row.progress_json ? JSON.parse(String(row.progress_json)) : null), models: row.models_json ? checkedModelSelection(JSON.parse(String(row.models_json))) : null };
 }
 export function getJob(id: string): GenerationJob | null {
 	const row = store().prepare('SELECT * FROM theater_jobs WHERE id = ?').get(id) as Row | undefined;
@@ -346,7 +348,7 @@ export function retryFailedJob(worldId: string, revision: number, jobId: string,
 		const models = checkedModelSelection(world.models ?? defaults);
 		const routes = providers(models);
 		// Keep the request, committed cursor and queued chat; manual retry adopts the current model routes atomically.
-		store().prepare("UPDATE theater_jobs SET status = 'pending', worker_id = NULL, heartbeat_at = NULL, completed_at = NULL, error = NULL, models_json = ?, providers_json = ? WHERE id = ? AND status = 'failed'")
+		store().prepare("UPDATE theater_jobs SET status = 'pending', worker_id = NULL, heartbeat_at = NULL, completed_at = NULL, error = NULL, stop_reason = NULL, models_json = ?, providers_json = ? WHERE id = ? AND status = 'failed'")
 			.run(JSON.stringify(models), JSON.stringify(routes), job.id);
 		return getJob(job.id)!;
 	});
@@ -356,9 +358,24 @@ export function stopJob(worldId: string, jobId: string): void {
 		const job = latestJob(worldId);
 		if (!job || job.id !== jobId || !['pending', 'running'].includes(job.status)) throw new Error('중단할 진행 중인 작업이 없습니다.');
 		// Clear ownership first so even a response arriving before the next heartbeat cannot commit.
-		store().prepare("UPDATE theater_jobs SET status = 'failed', worker_id = NULL, error = ?, completed_at = ? WHERE id = ?")
+		store().prepare("UPDATE theater_jobs SET status = 'failed', worker_id = NULL, stop_reason = 'user', error = ?, completed_at = ? WHERE id = ?")
 			.run('사용자가 자동 생성을 중단했습니다.', new Date().toISOString(), job.id);
 	});
+}
+/** A durable control intent is scoped to the exact question, separate from player events. */
+export function skipPlayerReply(worldId: string, jobId: string, until: number, eventId?: string): boolean {
+	return transaction(() => {
+		const job = latestJob(worldId);
+		if (!job || job.id !== jobId || !['pending', 'running'].includes(job.status)) return false;
+		if (job.revision !== getWorld(worldId).revision || !Number.isSafeInteger(until) || job.progress?.playerReplyUntil !== until || job.progress.playerReplyEventId !== eventId) return false;
+		store().prepare('UPDATE theater_jobs SET reply_skip_key = ? WHERE id = ?').run(JSON.stringify([until, eventId ?? null]), job.id);
+		return true;
+	});
+}
+export function shouldSkipPlayerReply(job: GenerationJob, workerId: string, until: number, eventId?: string): boolean {
+	checkJob(job, workerId);
+	const row = store().prepare('SELECT reply_skip_key FROM theater_jobs WHERE id = ?').get(job.id) as Row;
+	return row.reply_skip_key === JSON.stringify([until, eventId ?? null]);
 }
 export function enqueue(worldId: string, revision: number, request: PlayerRequest, defaults: ModelSelection, providers?: (selection: ModelSelection) => ProviderSnapshot): GenerationJob {
 	return transaction(() => {

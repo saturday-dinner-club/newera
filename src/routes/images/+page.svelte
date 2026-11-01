@@ -1,5 +1,7 @@
 <script lang="ts">
-	import { onMount, onDestroy, untrack } from 'svelte';
+	import AppearanceControl from '$lib/components/AppearanceControl.svelte';
+	import { onMount, onDestroy, untrack, tick } from 'svelte';
+	import { beforeNavigate } from '$app/navigation';
 	import type { PageProps } from './$types';
 	import type { ComfyCatalog } from '$lib/images/comfyui';
 	import type { HostedImageCatalog } from '$lib/images/models';
@@ -10,6 +12,10 @@
 	let registry = $state<ImagePreset[]>(untrack(() => structuredClone(data.imagePresets)));
 	let current = $state(untrack(() => structuredClone(data.settings)));
 	let selected = $state('');
+	let baseline = $state('');
+	let initialized = $state(false);
+	beforeNavigate(({ cancel }) => { if (dirty && !confirm('저장하지 않은 프리셋 변경이 있어요. 이 화면을 떠날까요?')) cancel(); });
+	onMount(() => { const protect = (event: BeforeUnloadEvent) => { if (dirty) { event.preventDefault(); event.returnValue = ''; } }; window.addEventListener('beforeunload', protect); return () => window.removeEventListener('beforeunload', protect); });
 	let revision = $state(0);
 	let name = $state('');
 	let provider = $state<ImageProvider>('comfyui');
@@ -57,7 +63,9 @@
 			: [['size', size], ['quality', quality], ['outputFormat', outputFormat], ['outputCompression', outputFormat === 'jpeg' || outputFormat === 'webp' ? outputCompression : undefined], ['background', background], ...(provider === 'openrouter' ? [['aspectRatio', aspectRatio], ['resolution', resolution]] as [string, unknown][] : [])];
 		return { provider, baseUrl, stylePrompt, apiKeyEnv, model, options: Object.fromEntries(entries.filter(([, value]) => value !== '' && value !== undefined)) } as ImagePresetConfig;
 	});
-	function choose(id: string) {
+	let dirty = $derived(initialized && baseline !== JSON.stringify({ name, config }));
+	async function choose(id: string) {
+		initialized = false;
 		resetCatalog();
 		const saved = registry.find((entry) => entry.id === id);
 		selected = saved?.id ?? ''; revision = saved?.revision ?? 0; name = saved?.name ?? '';
@@ -73,6 +81,7 @@
 			outputCompression = options.outputCompression as number | undefined; background = String(options.background ?? ''); aspectRatio = String(options.aspectRatio ?? ''); resolution = String(options.resolution ?? '');
 		}
 		error = ''; notice = '';
+		await tick(); baseline = JSON.stringify({ name, config }); initialized = true;
 		void loadCatalog();
 	}
 	function changeProvider(next: ImageProvider) {
@@ -112,7 +121,7 @@
 		try {
 			const response = await fetch('/api/image-presets', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: selected, revision, name, config }) });
 			const result = await response.json(); if (!response.ok) throw new Error(result.message);
-			registry = result.presets; choose(result.savedId); notice = '이미지 프리셋을 저장했습니다. 세션의 모델 설정에서 선택할 수 있습니다.';
+			registry = result.presets; await choose(result.savedId); notice = '이미지 프리셋을 저장했습니다. 세션의 모델 설정에서 선택할 수 있습니다.';
 		} catch (cause) { error = cause instanceof Error ? cause.message : '프리셋을 저장하지 못했습니다.'; } finally { saving = false; }
 	}
 	async function remove() {
@@ -120,7 +129,7 @@
 		try {
 			const response = await fetch('/api/image-presets', { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: selected, revision }) });
 			const result = await response.json(); if (!response.ok) throw new Error(result.message);
-			registry = result.presets; choose(''); notice = '이미지 프리셋을 삭제했습니다.';
+			registry = result.presets; await choose(''); notice = '이미지 프리셋을 삭제했습니다.';
 		} catch (cause) { error = cause instanceof Error ? cause.message : '프리셋을 삭제하지 못했습니다.'; } finally { saving = false; }
 	}
 	async function generate(event: SubmitEvent) {
@@ -135,19 +144,19 @@
 		} catch (cause) { error = controller.signal.aborted ? '이미지 수신을 중단했습니다. 이미 실행 중인 원격 작업은 계속될 수 있습니다.' : cause instanceof Error ? cause.message : '이미지를 생성하지 못했습니다.'; }
 		finally { generating = false; }
 	}
-	onMount(() => choose(registry[0]?.id ?? ''));
+	onMount(() => { void choose(registry[0]?.id ?? ''); });
 	onDestroy(() => { controller?.abort(); catalogController?.abort(); if (imageUrl) URL.revokeObjectURL(imageUrl); });
 </script>
 
 <svelte:head><title>이미지 프리셋 · newera</title><meta name="description" content="이미지 생성 설정을 프리셋으로 저장하고 세션마다 선택합니다." /></svelte:head>
-<header class="topbar"><a class="brand" href="/">newera<span>THEATER</span></a><a class="top-link" href="/">공연으로 돌아가기 ↗</a></header>
+<header class="topbar"><a class="brand" href="/">newera<span>THEATER</span></a><nav class="session-actions"><a class="top-link" href="/">공연</a><a class="top-link" href="/lores">작업실</a><AppearanceControl /></nav></header>
 <main class="image-settings">
-	<div class="intro"><p class="eyebrow">ILLUSTRATIONS</p><h1>이미지 생성 프리셋</h1><p>서버·모델·화풍을 이름으로 저장하고, 각 세션에서 사용할 프리셋을 선택하세요.</p></div>
+	<div class="intro"><p class="eyebrow">ILLUSTRATIONS</p><h1>삽화 프리셋</h1><p>서버·모델·화풍을 이름으로 저장하고, 각 세션에서 사용할 프리셋을 선택하세요.</p></div>
 	<div class="columns">
-		<section class="configuration" aria-labelledby="settings-heading"><h2 id="settings-heading">프리셋 관리</h2>
-			<label>저장한 프리셋<select value={selected} onchange={(event) => choose(event.currentTarget.value)} disabled={saving || generating}><option value="">새 프리셋 만들기</option>{#each registry as entry}<option value={entry.id}>{entry.name} · {imageProviderNames[entry.provider]}</option>{/each}</select></label>
+		<section class="configuration" aria-labelledby="settings-heading"><h2 id="settings-heading">1. 프리셋 관리</h2>
+			<label>저장한 프리셋<select value={selected} onchange={(event) => { if (!dirty || confirm('저장하지 않은 변경을 남겨두고 다른 프리셋을 열까요?')) void choose(event.currentTarget.value); else event.currentTarget.value = selected; }} disabled={saving || generating}><option value="">새 프리셋 만들기</option>{#each registry as entry}<option value={entry.id}>{entry.name} · {imageProviderNames[entry.provider]}</option>{/each}</select></label>
 			{#if selected}<p class="field-hint">{usedBy}개 세션에서 사용 중입니다. 변경 사항은 다음 이미지 생성부터 적용됩니다.</p>{/if}
-			<form onsubmit={save} class="settings-form">
+			{#if dirty}<p class="draft-notice" role="status">저장하지 않은 프리셋 변경이 있어요.</p>{/if}<form onsubmit={save} class="settings-form">
 				<label>프리셋 이름<input bind:value={name} maxlength="100" required disabled={saving || generating} placeholder="예: 학원물 삽화 · Anima" /></label>
 				<label>이미지 Provider<select value={provider} onchange={(event) => changeProvider(event.currentTarget.value as ImageProvider)} disabled={saving || generating}>{#each Object.entries(imageProviderNames) as [id, label]}<option value={id}>{label}</option>{/each}</select></label>
 				<label>이미지 서버 주소<input type="url" bind:value={baseUrl} required disabled={saving || generating} /></label>
@@ -179,11 +188,11 @@
 			</form>
 			{#if notice}<p class="feedback" role="status">{notice}</p>{/if}
 		</section>
-		<section class="generation" aria-labelledby="test-heading"><h2 id="test-heading">삽화 테스트</h2><p class="field-hint">화면의 설정으로 한 장을 생성합니다. OpenAI·xAI·OpenRouter 테스트는 유료 API를 호출합니다.</p>
-			<form onsubmit={generate} class="settings-form"><label>그릴 장면<textarea bind:value={prompt} rows="5" maxlength="32000" required disabled={generating}></textarea></label>{#if provider === 'comfyui'}<label>Seed · 비워두면 무작위<input type="number" bind:value={seed} min="0" max="281474976710655" step="1" placeholder="무작위" disabled={generating} /></label>{/if}<div class="buttons"><button class="primary" disabled={generating || saving || (provider === 'comfyui' ? !connected || !!missingNodes.length || workflow.models.some((field) => field.required && !profile.models[field.field]) : !model || !apiKeyEnv)}>테스트 이미지 생성</button>{#if generating}<button type="button" onclick={() => controller?.abort()}>생성 수신 중단</button>{/if}</div></form>
-			{#if generating}<p class="connection" role="status">이미지를 생성하고 있습니다. 완료되면 여기에 표시됩니다.</p>{/if}{#if error}<p class="feedback error" role="alert">{error}</p>{/if}
-			<div class="preview" aria-busy={generating}>{#if imageUrl}<img src={imageUrl} alt={`${generatedName} 테스트 삽화`} /><div class="image-details"><span>{generatedName} · {elapsed}초{generatedSeed ? ` · Seed ${generatedSeed}` : ''}</span><a href={imageUrl} download={`newera-image.${imageType === 'image/jpeg' ? 'jpg' : imageType === 'image/webp' ? 'webp' : 'png'}`}>이미지 내려받기 ↓</a></div>{:else}<div class="empty-preview"><span>장면을 그려보세요</span><p>생성한 이미지는 이곳에 표시됩니다.</p></div>{/if}</div>
-			<p class="field-hint">프리셋을 저장한 뒤 공연 화면의 모델 설정에서 선택하세요. 생성 조건과 프롬프트 지침은 로어북의 세계관 설정에 작성합니다. 이곳의 테스트 결과는 현재 화면에서만 표시합니다.</p>
+		<section class="generation" aria-labelledby="test-heading"><h2 id="test-heading">2. 장면 그려보기</h2><p class="field-hint">화면의 설정으로 한 장을 그립니다. OpenAI·xAI·OpenRouter 테스트는 유료 API를 호출합니다.</p>
+			<form onsubmit={generate} class="settings-form"><label>그릴 장면<textarea bind:value={prompt} rows="5" maxlength="32000" required disabled={generating}></textarea></label>{#if provider === 'comfyui'}<label>Seed · 비워두면 무작위<input type="number" bind:value={seed} min="0" max="281474976710655" step="1" placeholder="무작위" disabled={generating} /></label>{/if}<div class="buttons"><button class="primary" disabled={generating || saving || (provider === 'comfyui' ? !connected || !!missingNodes.length || workflow.models.some((field) => field.required && !profile.models[field.field]) : !model || !apiKeyEnv)}>삽화 그려보기</button>{#if generating}<button type="button" onclick={() => controller?.abort()}>그림 수신 멈추기</button>{/if}</div></form>
+			{#if generating}<p class="connection" role="status">장면을 그리고 있어요. 완성되면 여기에 보여드릴게요.</p>{/if}{#if error}<p class="feedback error" role="alert">{error}</p>{/if}
+			<div class="preview" aria-busy={generating}>{#if imageUrl}<img src={imageUrl} alt={`${generatedName} 테스트 삽화`} /><div class="image-details"><span>{generatedName} · {elapsed}초{generatedSeed ? ` · Seed ${generatedSeed}` : ''}</span><a href={imageUrl} download={`newera-image.${imageType === 'image/jpeg' ? 'jpg' : imageType === 'image/webp' ? 'webp' : 'png'}`}>이미지 내려받기 ↓</a></div>{:else}<div class="empty-preview"><span>장면을 그려보세요</span><p>완성한 삽화는 이곳에 표시됩니다.</p></div>{/if}</div>
+			<p class="field-hint">프리셋을 저장한 뒤 공연 화면의 모델 설정에서 선택하세요. 삽화를 더할 조건과 묘사 지침은 로어북의 세계관 설정에 작성합니다. 이곳의 테스트 결과는 현재 화면에서만 표시합니다.</p>
 		</section>
 	</div>
 </main>
@@ -193,10 +202,10 @@
 	.intro { margin-bottom: 30px; } h1 { font-size: 30px; font-weight: 500; margin: 0 0 14px; } h2 { font-size: 18px; font-weight: 500; margin: 0 0 20px; }
 	.intro > p:last-child { color: var(--muted); line-height: 1.8; }
 	.columns { display: grid; grid-template-columns: minmax(300px, 440px) minmax(0, 1fr); gap: 32px; align-items: start; }
-	.configuration, .generation { min-width: 0; border: 1px solid var(--line); background: #202024; padding: 24px; border-radius: 5px; }
-	.dimensions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; } .connection { color: #b7c5a9; font-size: 12px; line-height: 1.8; }
-	.buttons { display: flex; gap: 10px; flex-wrap: wrap; } .preview { margin-top: 24px; border: 1px solid var(--line); background: #19191c; }
-	.preview img { display: block; width: 100%; max-height: 720px; object-fit: contain; } .empty-preview { min-height: 300px; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #a99981; padding: 20px; text-align: center; }
+	.configuration, .generation { min-width: 0; border: 1px solid var(--line); background: var(--surface); padding: 24px; border-radius: 5px; }
+	.dimensions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; } .connection { color: var(--muted); font-size: 12px; line-height: 1.8; }
+	.buttons { display: flex; gap: 10px; flex-wrap: wrap; } .preview { margin-top: 24px; border: 1px solid var(--line); background: var(--page); }
+	.preview img { display: block; width: 100%; max-height: 720px; object-fit: contain; } .empty-preview { min-height: 300px; display: flex; flex-direction: column; justify-content: center; align-items: center; color: var(--accent); padding: 20px; text-align: center; }
 	.empty-preview span { font-family: Georgia, serif; font-size: 23px; } .empty-preview p { color: var(--muted); font-size: 12px; }
 	.image-details { padding: 14px; display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
 	@media (max-width: 760px) { .columns { grid-template-columns: 1fr; gap: 20px; } .image-settings { padding: 28px 16px; } .configuration, .generation { padding: 18px; } }

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
+	import { enhance } from '$lib/editor/drafts';
 	import { untrack } from 'svelte';
 	import type { EntityTemplate, World } from '$lib/theater/types';
 	import PropertiesEditor from './PropertiesEditor.svelte';
@@ -11,23 +11,23 @@
 <form method="POST" action="?/template" use:enhance class="settings-form" aria-label={template ? `${template.name} 기본 설정` : '새 캐릭터·사물 만들기'}>
 	<input type="hidden" name="worldId" value={world.id} /><input type="hidden" name="revision" value={world.revision} />
 	{#if template}<input type="hidden" name="templateId" value={template.id} /><input type="hidden" name="kind" value={template.kind} />{:else}<label>무엇을 만들까요?<select name="kind" bind:value={kind}><option value="character">캐릭터</option><option value="object">사물</option></select></label>{/if}
-	<label>기본 이름<input name="name" value={template?.name ?? ''} maxlength="200" placeholder={kind === 'character' ? '예: 서연' : '예: 무대 작업등'} required /></label>
-	<label>{kind === 'character' ? '어떤 사람인가요?' : '어떤 사물인가요?'}<textarea name="description" rows="4" value={template?.description ?? ''} placeholder={kind === 'character' ? '역할, 배경, 알고 있는 것과 모르는 것…' : '생김새와 쓰임새를 알려 주세요.'} required></textarea></label>
+	<label>기본 이름<input name="name" defaultValue={template?.name ?? ''} maxlength="200" placeholder={kind === 'character' ? '예: 서연' : '예: 무대 작업등'} required /></label>
+	<label>{kind === 'character' ? '어떤 사람인가요?' : '어떤 사물인가요?'}<textarea name="description" rows="4" defaultValue={template?.description ?? ''} placeholder={kind === 'character' ? '역할, 배경, 알고 있는 것과 모르는 것…' : '생김새와 쓰임새를 알려 주세요.'} required></textarea></label>
 	{#if kind === 'character'}
-		<label>기본 외형<textarea name="baseAppearance" rows="2" maxlength="400" value={template?.baseAppearance ?? ''} placeholder="옷이 바뀌어도 유지되는 머리 모양, 안경 등."></textarea></label>
-		<label>옷 취향<textarea name="clothingPreferences" rows="3" maxlength="1200" value={template?.clothingPreferences ?? ''} placeholder="좋아하는 소재·색·스타일, 피하는 옷차림."></textarea></label>
-		<label>음식 취향<textarea name="foodPreferences" rows="3" maxlength="1200" value={template?.foodPreferences ?? ''} placeholder="좋아하고 꺼리는 맛과 메뉴. 개인적인 취향이며 다른 인물에게 자동 공개되지 않아요."></textarea></label>
+		<label>기본 외형<textarea name="baseAppearance" rows="2" maxlength="400" defaultValue={template?.baseAppearance ?? ''} placeholder="옷이 바뀌어도 유지되는 머리 모양, 안경 등."></textarea></label>
+		<label>옷 취향<textarea name="clothingPreferences" rows="3" maxlength="1200" defaultValue={template?.clothingPreferences ?? ''} placeholder="좋아하는 소재·색·스타일, 피하는 옷차림."></textarea></label>
+		<label>음식 취향<textarea name="foodPreferences" rows="3" maxlength="1200" defaultValue={template?.foodPreferences ?? ''} placeholder="좋아하고 꺼리는 맛과 메뉴. 개인적인 취향이며 다른 인물에게 자동 공개되지 않아요."></textarea></label>
 		<WardrobeEditor value={template?.wardrobe ?? []} />
-		<label>성격과 말투<textarea name="personality" rows="5" value={template?.personality ?? ''} placeholder="무엇을 중요하게 여기나요? 낯선 사람과 친구에게는 어떻게 말하나요?" maxlength="12000"></textarea></label>
-		<label>기본 반응 속도<input type="number" name="reactionBaseSpeed" min="1" max="100" step="1" value={template?.reactionProfile?.baseSpeed ?? 10} required /></label>
-		<label>말수 성향 · 0~100<input type="number" name="reactionTalkativeness" min="0" max="100" step="1" value={template?.reactionProfile?.talkativeness ?? 50} required /></label>
+		<label>성격과 말투<textarea name="personality" rows="5" defaultValue={template?.personality ?? ''} placeholder="무엇을 중요하게 여기나요? 낯선 사람과 친구에게는 어떻게 말하나요?" maxlength="12000"></textarea></label>
+		<label>기본 반응 속도<input type="number" name="reactionBaseSpeed" min="1" max="100" step="1" defaultValue={template?.reactionProfile?.baseSpeed ?? 10} required /></label>
+		<label>말수 성향 · 0~100<input type="number" name="reactionTalkativeness" min="0" max="100" step="1" defaultValue={template?.reactionProfile?.talkativeness ?? 50} required /></label>
 		<p class="field-hint">속도와 말수 성향이 높으면 행동을 판단할 기회가 자주 돌아옵니다. 실제로 말할지는 인물이 결정하며, 현재 흥분도도 반응 속도에 영향을 줍니다.</p>
-		<label>바라는 것 · 한 줄에 하나씩<textarea name="goals" rows="3" value={template?.goals.join('\n') ?? ''} placeholder="공연 전에 마지막 장면을 맞춰본다"></textarea></label>
+		<label>바라는 것 · 한 줄에 하나씩<textarea name="goals" rows="3" defaultValue={template?.goals.join('\n') ?? ''} placeholder="공연 전에 마지막 장면을 맞춰본다"></textarea></label>
 	{/if}
 	<PropertiesEditor name="initialState" value={template?.initialState} title="처음 상태" />
 	<details class="advanced-editor"><summary>상호작용·자동 반응 · 고급 설정</summary><p class="field-hint">스위치나 조건에 따른 행동을 정의할 때 사용합니다.</p>
-		<label>상호작용 목록 · JSON<textarea name="interactions" class="code-input" rows="6" value={JSON.stringify(template?.interactions ?? [], null, 2)}></textarea></label>
-		<label>자동 반응 목록 · JSON<textarea name="reactions" class="code-input" rows="5" value={JSON.stringify(template?.reactions ?? [], null, 2)}></textarea></label>
+		<label>상호작용 목록 · JSON<textarea name="interactions" class="code-input" rows="6" defaultValue={JSON.stringify(template?.interactions ?? [], null, 2)}></textarea></label>
+		<label>자동 반응 목록 · JSON<textarea name="reactions" class="code-input" rows="5" defaultValue={JSON.stringify(template?.reactions ?? [], null, 2)}></textarea></label>
 	</details>
 	{#if template}<p class="field-hint">소개·성격·목표는 이 설정을 사용하는 모두에게 적용됩니다. 현재 이름·위치·기억·관계는 그대로예요. 처음 상태는 새로 배치하거나 초기화할 때 적용되며, 배치별로 정한 시작 상태가 있으면 그 값을 우선합니다.</p>{/if}
 	<button class="primary">{template ? '기본 설정 저장' : kind === 'character' ? '캐릭터 만들기' : '사물 만들기'}</button>

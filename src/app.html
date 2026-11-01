@@ -4,6 +4,15 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="text-scale" content="scale" />
+		<script>
+			(() => {
+				let theme = 'system', size = '18';
+				try { theme = localStorage.getItem('newera-theme') || theme; size = localStorage.getItem('newera-font-size') || size; } catch {}
+				if (!['system', 'dark', 'light'].includes(theme)) theme = 'system';
+				document.documentElement.dataset.theme = theme === 'system' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme;
+				if (['16', '18', '20'].includes(size)) document.documentElement.style.setProperty('--reading-size', size + 'px');
+			})();
+		</script>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">

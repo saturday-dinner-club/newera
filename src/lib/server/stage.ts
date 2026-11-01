@@ -5,7 +5,7 @@ import { generationHistoryEvents } from '$lib/theater/generation-history';
 import { createDirector, modelSettings } from './oev';
 import { createMemoryRecall } from './memory-search';
 import { resolveProviderSnapshot } from './providers';
-import { checkJob, claimJob, enqueue, failJob, finishJob, getJobProviders, getWorld, heartbeatJob, nextJobInput, pinJobProviders, retryFailedJob, runnableJobs, saveJobProgress } from './stage-store';
+import { checkJob, claimJob, enqueue, failJob, finishJob, getJobProviders, getWorld, heartbeatJob, nextJobInput, pinJobProviders, retryFailedJob, runnableJobs, saveJobProgress, shouldSkipPlayerReply } from './stage-store';
 import { ensureImageWorker } from './images/trigger-worker';
 import { withInferenceRootContext } from './inference-log';
 
@@ -46,6 +46,7 @@ async function processJob(id: string): Promise<void> {
 				await resolveTurn(getWorld(job.worldId), job.request, director, checkpoint, {
 					progress: job.progress,
 					playerReplyTimeoutMs: settings.playerReplyTimeoutMs,
+					skipReply: (until, eventId) => shouldSkipPlayerReply(job, workerId, until, eventId),
 					nextInput: (consumedInputs) => nextJobInput(job, workerId, consumedInputs),
 					onProgress: (world, progress) => saveJobProgress(job, workerId, world, progress)
 				});

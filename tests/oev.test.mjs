@@ -48,7 +48,7 @@ function provider(options = {}) {
 		if (body.response_format?.json_schema?.name === 'image_prompt') {
 			return json({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({ prompt: 'A quiet theater.' }) } }] });
 		}
-		const output = { actionId: 'speak:player', targetId: 'player', narrative: null, utterance: '반가워요. 같이 준비할까요?', memoUpdate: null, ...options.output };
+		const output = { actionId: 'speak:player', targetId: 'player', ...(options.output?.parts ? {} : { narrative: null, utterance: '반가워요. 같이 준비할까요?' }), memoUpdate: null, ...options.output };
 		return json({ choices: [{ finish_reason: options.finishReason ?? 'stop', message: { content: options.content ?? JSON.stringify(output) } }] });
 	};
 	return calls;
@@ -238,7 +238,7 @@ test('writing style reaches only performance generation and keeps the strict act
 		assert.equal(generation.messages[0].role, 'system');
 		assert.ok(generation.messages[0].content.includes(style));
 		assert.match(generation.messages[0].content, /표현 방식에만/);
-		assert.match(generation.messages[0].content, /narrative와 utterance의 분리/);
+		assert.match(generation.messages[0].content, /parts에서 행동과 대사의 분리와 순서, 최대 6개 제한/);
 		assert.equal(generation.response_format.json_schema.strict, true);
 		assert.deepEqual(JSON.parse(generation.messages[1].content).availableActions, actions);
 		await director.perform(state, actions, ' \n ');
@@ -682,7 +682,7 @@ test('JSON and action-schema failures log different stages and safe field shapes
 	const failures = logs.filter(([label]) => label === '[추론] 출력 검증 실패').map(([, data]) => data);
 	assert.deepEqual(failures.map(data => data.stage), ['json_parse', 'action_schema']);
 	assert.equal(failures[0].code, 'invalid_json'); assert.equal(failures[1].code, 'invalid_output');
-	assert.deepEqual(failures[1].missingFields, ['narrative']); assert.equal(failures[1].unexpectedFieldCount, 1); assert.equal(failures[1].fieldTypes.utterance, 'string');
+	assert.deepEqual(failures[1].missingFields, ['parts']); assert.equal(failures[1].unexpectedFieldCount, 2); assert.equal(failures[1].fieldTypes.actionId, 'string');
 	assert.ok(logs.some(([label, data]) => label === '[추론] 출력 검증 통과' && data.stage === 'action_schema'));
 	assert.ok(!logs.some(([label]) => label === '[추론] 재시도 소진'));
 	const serialized = JSON.stringify(logs);
@@ -736,6 +736,25 @@ test('cancellation during retry backoff is logged as cancellation without exhaus
 	});
 	assert.ok(logs.some(([label]) => label === '[추론] 취소')); assert.ok(!logs.some(([label]) => label === '[추론] 재시도 소진'));
 	assert.ok(!JSON.stringify(logs).includes('private-cancel-reason')); assert.ok(!JSON.stringify(logs).includes('private-upstream-error'));
+});
+
+test('ordered expression parts are requested, validated and reviewed in full without forcing pairs', async () => {
+	const parts = [
+		{ kind: 'act', text: '대본을 내려놓는다.' }, { kind: 'speak', text: '괜찮아요.' },
+		{ kind: 'speak', text: '조금만 기다려 주세요.' }, { kind: 'act', text: '벽시계를 본다.' },
+		{ kind: 'act', text: '숨을 고른다.' }, { kind: 'speak', text: '함께 있어 주실래요?' }
+	];
+	const calls = provider({ output: { parts } });
+	try {
+		const output = await (await createDirector(new AbortController().signal)).perform(state, actions);
+		assert.deepEqual(output.parts, parts);
+		const generation = calls.find(call => call.body?.response_format?.json_schema?.name === 'actor_performance');
+		assert.deepEqual(generation.body.response_format.json_schema.schema.required, ['actionId', 'targetId', 'parts', 'memoUpdate']);
+		assert.equal(generation.body.response_format.json_schema.schema.properties.parts.maxItems, 6);
+		for (const call of calls.filter(call => call.body?.questions?.identity_check || call.body?.questions?.performance_check)) assert.deepEqual(call.body.state.proposal.parts, parts);
+		provider({ output: { parts: [...parts, parts[0]] } });
+		await assert.rejects((await createDirector(new AbortController().signal)).perform(state, actions), /1~6/);
+	} finally { globalThis.fetch = originalFetch; }
 });
 
 test('generation selects detailed actions beyond the typed endpoint choice limit', async () => {

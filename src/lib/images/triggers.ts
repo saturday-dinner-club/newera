@@ -40,7 +40,7 @@ export function imageSceneSnapshot(world: World): ImageSceneSnapshot {
 		scene: { id: scene.id, name: scene.name, description: scene.description.slice(0, 4000) },
 		time: imageGameTime({ minute: storyMinute(world), tick: world.state.tick }),
 		cast: residents.map((entity) => ({ id: entity.id, name: entity.name, appearance: (entity.appearance ?? '').slice(0, 1000) })),
-		recentEvents: world.state.events.filter((event) => event.sceneId === sceneId).slice(-8).map((event) => ({ id: event.id, tick: event.tick, actor: event.actorId === 'player' ? '플레이어' : world.state.instances.find((entity) => entity.id === event.actorId)?.name ?? '무대', kind: event.kind, narrative: (event.narrative ?? event.text).slice(0, 1500), utterance: event.utterance?.slice(0, 1500) ?? null }))
+		recentEvents: world.state.events.filter((event) => event.sceneId === sceneId).slice(-8).map((event) => ({ id: event.id, tick: event.tick, actor: event.actorId === 'player' ? '플레이어' : world.state.instances.find((entity) => entity.id === event.actorId)?.name ?? '무대', kind: event.kind, narrative: (event.narrative ?? event.text).slice(0, 1500), utterance: event.utterance?.slice(0, 1500) ?? null, ...(event.parts ? { parts: event.parts.map((part) => ({ kind: part.kind, text: part.text.slice(0, 1500) })) } : {}) }))
 	}).slice(0, 20000);
 	const objectStates = residents.filter((entity) => world.definition.templates.find((template) => template.id === entity.templateId)?.kind === 'object').map((entity) => ({ id: entity.id, name: entity.name, state: structuredClone(entity.state) }));
 	return { revision: world.revision, tick: world.state.tick, minute: storyMinute(world), sceneId, eventId: world.state.events.at(-1)?.id ?? null, context, objectStates };

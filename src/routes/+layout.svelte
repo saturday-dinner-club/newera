@@ -1,5 +1,7 @@
 <script lang="ts">
+	import '$lib/styles/theme.css';
 	import './app.css';
+	import '$lib/styles/experience.css';
 	let { children } = $props();
 </script>
 

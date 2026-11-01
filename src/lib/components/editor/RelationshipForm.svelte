@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
+	import { enhance } from '$lib/editor/drafts';
 	import { untrack } from 'svelte';
 	import { relationshipMetrics } from '$lib/theater/types';
 	import { relationshipLabels, unknownRelationship } from '$lib/theater/reflection';
@@ -18,11 +18,11 @@
 			<div><strong>{relationshipLabels[metric]}</strong><small>{descriptions[metric]}</small></div>
 			<label class="metric-known"><input type="checkbox" name={`${metric}Known`} bind:checked={known[metric]} />{known[metric] ? '평가함' : '미평가'}</label>
 			<input type="range" min="0" max="100" step="1" bind:value={values[metric]} disabled={!known[metric]} aria-label={`${relationshipLabels[metric]} 조절`} />
-			<label class="metric-number"><span class="sr-only">{relationshipLabels[metric]} 수치</span><!-- Unknown is displayed as a dash; it is never silently stored as the slider midpoint. -->{#if known[metric]}<input type="number" name={metric} min="0" max="100" step="1" bind:value={values[metric]} required />{:else}<input type="text" value="—" disabled />{/if}</label>
+			<label class="metric-number"><span class="sr-only">{relationshipLabels[metric]} 수치</span><!-- Unknown is displayed as a dash; it is never silently stored as the slider midpoint. -->{#if known[metric]}<input type="number" name={metric} min="0" max="100" step="1" bind:value={values[metric]} required />{:else}<input type="text" defaultValue="—" disabled />{/if}</label>
 		</div>
 	{/each}
 	<p class="field-hint">미평가는 아직 판단하지 않았다는 뜻이에요. 각 항목은 서로 독립적입니다.</p>
-	<label>상대를 어떻게 생각하나요?<textarea name="impression" rows="3" maxlength="600" value={(relation ?? unknownRelationship()).impression} placeholder="좋아하는 사람이지만 중요한 약속은 직접 확인하고 싶다…"></textarea></label>
+	<label>상대를 어떻게 생각하나요?<textarea name="impression" rows="3" maxlength="600" defaultValue={(relation ?? unknownRelationship()).impression} placeholder="좋아하는 사람이지만 중요한 약속은 직접 확인하고 싶다…"></textarea></label>
 	{#if scope === 'current' && relation?.evidenceEventIds.length}<p class="field-hint">기존에 목격한 사건의 근거 {relation.evidenceEventIds.length}건은 유지됩니다.</p>{/if}
 	<div class="editor-actions"><button class="primary">관계 저장</button>{#if relation}<button type="submit" class="quiet-button" name="intent" value="remove" formnovalidate>이 관계 지우기</button>{/if}</div>
 </form>

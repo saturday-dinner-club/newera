@@ -6,7 +6,7 @@ export function memoryForEvent(event: StageEvent): WitnessedEvent {
 	return {
 		eventId: event.id, tick: event.tick, sceneId: event.sceneId,
 		kind: event.kind, actorId: event.actorId, targetId: event.targetId,
-		body: eventContent(event),
+		body: { ...eventContent(event), ...(event.parts ? { parts: structuredClone(event.parts) } : {}) },
 		...(event.interactionId !== undefined ? { interactionId: event.interactionId } : {}),
 		...(event.destinationId !== undefined ? { destinationId: event.destinationId } : {}),
 		...(event.changes !== undefined ? { changes: { ...event.changes } } : {})
