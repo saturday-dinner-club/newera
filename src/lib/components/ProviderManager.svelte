@@ -7,6 +7,8 @@
 	let id = $state('');
 	let label = $state('');
 	let kind = $state<ProviderKind>('oev');
+	let decisionApi = $state<PublicProvider['decisionApi']>('systemone');
+	let decisionMaxChoices = $state(255);
 	let baseUrl = $state('');
 	let apiKey = $state('');
 	let apiKeyEnv = $state('');
@@ -24,6 +26,8 @@
 		id = provider?.id ?? crypto.randomUUID();
 		label = provider?.label ?? '';
 		kind = provider?.kind ?? 'oev';
+		decisionApi = provider?.decisionApi ?? (kind === 'oev' ? 'systemone' : 'none');
+		decisionMaxChoices = provider?.decisionMaxChoices ?? 255;
 		baseUrl = provider?.baseUrl ?? '';
 		apiKey = ''; apiKeyEnv = provider?.apiKeyEnv ?? ''; clearApiKey = false;
 		keyConfigured = provider?.apiKeyConfigured ?? false;
@@ -31,6 +35,18 @@
 		outputTokenParameter = provider?.outputTokenParameter ?? 'max_completion_tokens';
 		structuredOutput = provider?.structuredOutput ?? 'json_schema';
 		error = ''; notice = '';
+	}
+	function preset(name: 'openai' | 'geniex') {
+		choose('');
+		kind = 'openai-compatible'; decisionApi = 'decision';
+		if (name === 'openai') {
+			label = 'OpenAI Luna'; baseUrl = 'https://api.openai.com/v1'; apiKeyEnv = 'OPENAI_API_KEY';
+			models = [{ id: 'luna', label: 'Luna · 판단 전용', modelId: 'gpt-6-luna', task: 'decision' }];
+		} else {
+			label = 'Geniex'; baseUrl = 'http://127.0.0.1:18181/v1';
+			decisionMaxChoices = 26;
+			notice = 'Provider를 저장한 뒤 서버 모델 목록을 가져와 별칭을 저장해 주세요.';
+		}
 	}
 	async function reload() {
 		busy = true; error = '';
@@ -62,7 +78,7 @@
 		if (busy || !registry) return;
 		busy = true; error = ''; notice = '';
 		try {
-			const response = await fetch('/api/providers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ revision: registry.revision, provider: { id, label, kind, baseUrl, apiKey, apiKeyEnv, models, outputTokenParameter, structuredOutput }, clearApiKey }) });
+			const response = await fetch('/api/providers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ revision: registry.revision, provider: { id, label, kind, decisionApi, decisionMaxChoices, baseUrl, apiKey, apiKeyEnv, models, outputTokenParameter, structuredOutput }, clearApiKey }) });
 			const result = await response.json();
 			if (!response.ok) throw new Error(result.message);
 			registry = result; choose(id); notice = 'Provider와 모델 별칭을 저장했습니다. 세션에서 사용할 모델을 선택해 적용해 주세요.';
@@ -86,14 +102,16 @@
 
 <section class="provider-manager" aria-label="Provider 관리">
 	<h3>Provider와 모델 별칭</h3>
-	<p class="field-hint">등록은 앱 전체에서 공유합니다. 판단은 OEV의 typed decision을 사용하며 생성은 OpenAI 호환 API도 선택할 수 있습니다.</p>
+	<p class="field-hint">등록은 앱 전체에서 공유합니다. 판단에는 System One 또는 Decision API를, 문장 생성에는 OEV 또는 OpenAI 호환 API를 선택합니다.</p>
+	<div class="model-buttons"><button type="button" onclick={() => preset('openai')} disabled={busy || !registry}>OpenAI Luna 추가</button><button type="button" onclick={() => preset('geniex')} disabled={busy || !registry}>Geniex 추가</button></div>
 	<label>편집할 Provider<select value={selected} onchange={(event) => choose(event.currentTarget.value)} disabled={busy || !registry}>
 		<option value="">새 Provider 추가</option>
 		{#each registry?.providers ?? [] as provider}<option value={provider.id}>{provider.label}</option>{/each}
 	</select></label>
 	<form onsubmit={save} class="provider-form">
 		<label>Provider 이름<input bind:value={label} placeholder="예: Mac Studio · 집 서버" maxlength="100" required disabled={busy} /></label>
-		<label>API 유형<select bind:value={kind} disabled={busy || selected === 'default'}><option value="oev">OEV · 판단/생성/임베딩</option><option value="openai-compatible">OpenAI 호환 · 생성/임베딩</option></select></label>
+		<label>생성·임베딩 API 유형<select bind:value={kind} onchange={(event) => { decisionApi = event.currentTarget.value === 'oev' ? 'systemone' : 'none'; }} disabled={busy || selected === 'default'}><option value="oev">OEV</option><option value="openai-compatible">OpenAI 호환</option></select></label>
+		<label>판단 API<select bind:value={decisionApi} disabled={busy}><option value="none">사용 안 함</option><option value="systemone">System One · /systemone</option><option value="decision">Decision API</option></select></label>
 		<label>API 기본 주소<input type="url" bind:value={baseUrl} placeholder="http://macstudio:12821/v1" required disabled={busy} /></label>
 		<label>API 키<input type="password" bind:value={apiKey} autocomplete="new-password" placeholder={keyConfigured ? '등록된 키 유지 · 바꿀 때만 입력' : '인증이 필요할 때 입력'} disabled={busy} /></label>
 		{#if keyConfigured}<label class="provider-key-clear"><input type="checkbox" bind:checked={clearApiKey} disabled={busy} />저장된 API 키 지우기</label>{/if}
@@ -106,13 +124,14 @@
 				<fieldset><legend>모델 {index + 1}</legend>
 					<label>표시 별칭<input bind:value={model.label} placeholder="빠른 판단 · 이야기 생성" maxlength="100" required disabled={busy} /></label>
 					<label>실제 모델 ID<input bind:value={model.modelId} placeholder="gemma4-26b" maxlength="200" required disabled={busy} /></label>
-					<label>용도<select bind:value={model.task} disabled={busy}><option value="generation">판단·생성용 모델</option><option value="embedding">임베딩용 모델</option></select></label>
+					<label>용도<select bind:value={model.task} disabled={busy}><option value="generation">{decisionApi === 'none' ? '문장 생성용' : '판단·문장 생성용'}</option><option value="decision" disabled={decisionApi === 'none'}>판단 전용 · Luna 등</option><option value="embedding">임베딩용</option></select></label>
 					<button type="button" onclick={() => { models = models.filter((_, row) => row !== index); }} disabled={busy}>별칭 제거</button>
 				</fieldset>
 			{/each}
 			<button type="button" onclick={() => { models = [...models, { id: crypto.randomUUID(), label: '', modelId: '', task: 'generation' }]; }} disabled={busy || models.length >= 100}>모델 별칭 추가</button>
 		</div>
 		<details><summary>API 세부 옵션</summary>
+			{#if decisionApi === 'decision'}<label>한 질문의 후보 수 한도<input type="number" bind:value={decisionMaxChoices} min="2" max="255" required disabled={busy} /></label><p class="field-hint">OpenAI Luna는 255개, 현재 Geniex는 26개입니다. 후보를 임의로 생략하지 않고 한도를 넘으면 알립니다.</p>{/if}
 			<label>API 키 환경 변수<input bind:value={apiKeyEnv} placeholder="예: MY_PROVIDER_API_KEY" disabled={busy} /></label>
 			<p class="field-hint">서버 환경 변수의 키를 쓸 때 지정합니다. 직접 입력한 키보다 우선합니다.</p>
 			<label>구조화된 출력<select bind:value={structuredOutput} disabled={busy}><option value="json_schema">JSON Schema</option><option value="json_object">JSON 객체 · 앱에서 스키마 검증</option></select></label>

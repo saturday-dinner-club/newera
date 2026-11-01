@@ -1,7 +1,14 @@
 import { inactivityModes, relationshipMetrics } from './types.ts';
+import type { DecisionApi } from './types.ts';
 import type { CharacterReflection, ReflectionContext, ReactionProfile, Relationships, RelationshipScores, RelationshipMetric, CharacterMemo, Condition, EntityInstance, EntityMemory, EntityTemplate, EventKind, Interaction, ModelSelection, ObjectReaction, Properties, Scene, Spawn, StageEvent, Value, WorldDefinition, WorldState } from './types.ts';
 import { memoryForEvent } from './memory.ts';
 import { checkedParts, summarizeParts } from './expression-parts.ts';
+
+function decisionApiField(value: unknown): { decisionApi?: DecisionApi } {
+	if (value === undefined) return {};
+	if (value !== 'systemone' && value !== 'decision') throw new Error('판단 기록의 API 유형이 올바르지 않습니다.');
+	return { decisionApi: value };
+}
 
 export function record(value: unknown, label: string): Record<string, unknown> {
 	if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label}: JSON 객체가 필요합니다.`);
@@ -251,9 +258,9 @@ export function validateState(value: unknown, definition: WorldDefinition): Worl
 		let inactivity;
 		if (row.inactivity !== undefined) {
 			const selection = record(row.inactivity, '비참여 상태');
-			exactKeys(selection, ['mode', 'tick', 'model'], '비참여 상태');
+			exactKeys(selection, ['mode', 'tick', 'model', ...(Object.hasOwn(selection, 'decisionApi') ? ['decisionApi'] : [])], '비참여 상태');
 			if (template.kind !== 'character' || !inactivityModes.includes(selection.mode as typeof inactivityModes[number])) throw new Error('캐릭터의 비참여 상태가 올바르지 않습니다.');
-			inactivity = { mode: selection.mode as typeof inactivityModes[number], tick: integer(selection.tick, '비참여 선택 시점', tick), model: text(selection.model, '비참여 판단 모델', 200) };
+			inactivity = { mode: selection.mode as typeof inactivityModes[number], tick: integer(selection.tick, '비참여 선택 시점', tick), model: text(selection.model, '비참여 판단 모델', 200), ...decisionApiField(selection.decisionApi) };
 		}
 		let appearanceSelection;
 		if (row.appearanceSelection !== undefined) {
@@ -264,7 +271,7 @@ export function validateState(value: unknown, definition: WorldDefinition): Worl
 			if ((selection.minute === undefined) !== (selection.sceneId === undefined)) throw new Error('옷차림 선택 시각과 장소는 함께 지정해야 합니다.');
 			const timing = selection.minute === undefined ? {} : { minute: integer(selection.minute, '옷차림 선택 시각', 1439), sceneId: identifier(selection.sceneId, '옷차림 선택 장소') };
 			if (day === source.day && timing.minute !== undefined && timing.minute > Number(source.minute)) throw new Error('옷차림 선택 시각이 현재보다 미래입니다.');
-			appearanceSelection = { day, ...timing, outfitId: selection.outfitId === null ? null : identifier(selection.outfitId, 'outfit.id'), model: text(selection.model, '옷차림 판단 모델', 200) };
+			appearanceSelection = { day, ...timing, outfitId: selection.outfitId === null ? null : identifier(selection.outfitId, 'outfit.id'), model: text(selection.model, '옷차림 판단 모델', 200), ...decisionApiField(selection.decisionApi) };
 		}
 		if (memo && template.kind !== 'character') throw new Error('개인 메모는 캐릭터에만 저장할 수 있습니다.');
 		const reflectedThroughEventId = row.reflectedThroughEventId === undefined || row.reflectedThroughEventId === null ? null : text(row.reflectedThroughEventId, '관찰 해석 위치', 160);
@@ -312,7 +319,7 @@ export function validateState(value: unknown, definition: WorldDefinition): Worl
 		}
 		if (row.decision !== undefined) {
 			const trace = record(row.decision, 'decision');
-			result.decision = { model: text(trace.model, 'decision.model', 200), choice: text(trace.choice, 'decision.choice', 500) };
+			result.decision = { model: text(trace.model, 'decision.model', 200), choice: text(trace.choice, 'decision.choice', 500), ...decisionApiField(trace.decisionApi) };
 			if (trace.acted !== undefined) result.decision.acted = boolean(trace.acted, 'decision.acted');
 			if (trace.generationModel !== undefined) result.decision.generationModel = text(trace.generationModel, 'decision.generationModel', 200);
 			for (const [key, maximum] of [['reaction', 1], ['intensity', 2]] as const) {

@@ -9,7 +9,7 @@
 	import { transcriptGroups } from '$lib/theater/transcript';
 	import { bodyParts } from '$lib/theater/expression-parts';
 	import { eventPresentations } from '$lib/theater/presentation';
-	import { inactivityLabels, relationshipMetrics } from '$lib/theater/types';
+	import { decisionApiLabels, inactivityLabels, relationshipMetrics } from '$lib/theater/types';
 	import { relationshipLabels } from '$lib/theater/reflection';
 	import { memoryForEvent } from '$lib/theater/memory';
 	import type { ModelSelection } from '$lib/theater/types';
@@ -133,12 +133,12 @@
 		decisionModel = savedDecision ?? modelCatalog?.defaults.decisionModel ?? '';
 		textModel = savedText ?? modelCatalog?.defaults.textModel ?? '';
 	});
-	async function loadModels() {
+	async function loadModels(refresh = false) {
 		if (modelsLoading) return;
 		modelsLoading = true;
 		modelsError = '';
 		try {
-			const response = await fetch('/api/models', { cache: 'no-store' });
+			const response = await fetch('/api/models', { method: refresh ? 'POST' : 'GET', cache: 'no-store' });
 			const catalog = await response.json();
 			if (!response.ok) throw new Error(catalog.message || '모델 목록을 불러오지 못했습니다.');
 			modelCatalog = catalog;
@@ -252,14 +252,15 @@
 				<label>반응 모델<select name="decisionModel" bind:value={decisionModel} disabled={modelsLoading || modelsSaving || !modelCatalog} required>
 					<option value="">{modelsLoading ? '목록을 불러오는 중…' : '모델을 선택하세요'}</option>
 					{#if decisionModel && !modelCatalog?.models.includes(decisionModel)}<option value={decisionModel} disabled>{decisionModel} (목록에 없음)</option>{/if}
-					{#each modelCatalog?.options.filter((entry) => entry.decision) ?? [] as option}<option value={option.value}>{option.providerLabel} / {option.label}</option>{/each}
+					{#each modelCatalog?.options.filter((entry) => entry.decision) ?? [] as option}<option value={option.value}>{option.providerLabel} / {option.label} · {decisionApiLabels[option.decisionApi ?? 'systemone']}</option>{/each}
 				</select></label>
 				<label>문장 모델<select name="textModel" bind:value={textModel} disabled={modelsLoading || modelsSaving || !modelCatalog} required>
 					<option value="">{modelsLoading ? '목록을 불러오는 중…' : '모델을 선택하세요'}</option>
 					{#if textModel && !modelCatalog?.models.includes(textModel)}<option value={textModel} disabled>{textModel} (목록에 없음)</option>{/if}
-					{#each modelCatalog?.options ?? [] as option}<option value={option.value}>{option.providerLabel} / {option.label}</option>{/each}
+					{#each modelCatalog?.options.filter((entry) => entry.generation) ?? [] as option}<option value={option.value}>{option.providerLabel} / {option.label}</option>{/each}
 				</select></label>
-				<div class="model-buttons"><button disabled={modelsLoading || modelsSaving || !modelCatalog?.options.some((entry) => entry.value === decisionModel && entry.decision) || !modelCatalog?.models.includes(textModel)}>모델 적용</button><button name="mode" value="defaults" formnovalidate disabled={modelsSaving}>기본 설정 사용</button><button type="button" onclick={loadModels} disabled={modelsLoading || modelsSaving}>목록 새로고침</button></div>
+				<div class="model-buttons"><button disabled={modelsLoading || modelsSaving || !modelCatalog?.options.some((entry) => entry.value === decisionModel && entry.decision) || !modelCatalog?.options.some((entry) => entry.value === textModel && entry.generation)}>모델 적용</button><button name="mode" value="defaults" formnovalidate disabled={modelsSaving}>기본 설정 사용</button><button type="button" onclick={() => loadModels(true)} disabled={modelsLoading || modelsSaving}>목록 새로고침</button></div>
+				<p class="field-hint">목록 새로고침은 등록된 서버를 조회해 새 모델을 별칭으로 추가합니다. 기존 별칭과 선택한 모델은 유지합니다.</p>
 			</form>
 			{#if modelsError}<p class="feedback error" role="alert">{modelsError}</p>{/if}
 			{#each modelCatalog?.errors ?? [] as message}<p class="feedback error">{message}</p>{/each}
@@ -317,7 +318,7 @@
 		<label class="event-details-toggle"><input type="checkbox" bind:checked={showEventDetails} />기록 정보 표시</label>
 		<details class="world-notes"><summary>세계관과 현재 인물의 기억</summary><p>{world.definition.description}</p><p>{world.definition.rules}</p>
 			{#each characters as instance}<h3>{instance.name}</h3>
-				{#if instance.inactivity}<p>최근 비참여 선택: {inactivityLabels[instance.inactivity.mode]} · 판단 {instance.inactivity.model}</p>{/if}
+				{#if instance.inactivity}<p>최근 비참여 선택: {inactivityLabels[instance.inactivity.mode]} · 판단 {instance.inactivity.model} · {decisionApiLabels[instance.inactivity.decisionApi ?? 'systemone']}</p>{/if}
 				<details class="relationship-notes"><summary>상대별 관계 · 이 인물의 개인적 인식</summary>
 					{#each Object.entries(instance.relationships ?? {}) as [id, relation]}
 						<article><h4>{actorName(world, id)}</h4><dl>{#each relationshipMetrics as metric}<div><dt>{relationshipLabels[metric]}</dt><dd>{relation[metric] ?? '미평가'}</dd></div>{/each}</dl>
@@ -359,7 +360,7 @@
 									<div class="event-metadata">
 										<small>{eventScene?.name} · {event.tick}회</small>
 										{#if event.changes && Object.keys(event.changes).length}<small class="state-change">{Object.entries(event.changes).map(([key, value]) => `${key}: ${value}`).join(' · ')}</small>{/if}
-										{#if event.decision}<details class="decision-detail"><summary>선택 기록</summary><small>{event.decision.acted === undefined ? '이전 판단' : event.decision.acted ? '행동한다' : '지켜본다'} · {event.decision.choice} · 판단 {event.decision.model}{#if event.decision.generationModel} · 생성 {event.decision.generationModel}{/if}</small></details>{/if}
+										{#if event.decision}<details class="decision-detail"><summary>선택 기록</summary><small>{event.decision.acted === undefined ? '이전 판단' : event.decision.acted ? '행동한다' : '지켜본다'} · {event.decision.choice} · 판단 {event.decision.model} · {decisionApiLabels[event.decision.decisionApi ?? 'systemone']}{#if event.decision.generationModel} · 생성 {event.decision.generationModel}{/if}</small></details>{/if}
 									</div>
 								{/if}
 							{/if}

@@ -6,11 +6,11 @@ import { applyReflection, reflectionContext } from './reflection.ts';
 import { applyAppearance, needsAppearance } from './appearance.ts';
 import { inactivityModes } from './types.ts';
 import { checkedReactionSchedule, consumeReaction, reserveReaction } from './reaction-scheduler.ts';
-import type { ActorPerformance, CharacterReflection, InactivityMode, OutfitOption, PlayerRequest, ReflectionContext, StageAction, TurnProgress, WitnessedEvent, World } from './types.ts';
+import type { ActorPerformance, CharacterReflection, DecisionApi, InactivityMode, OutfitOption, PlayerRequest, ReflectionContext, StageAction, TurnProgress, WitnessedEvent, World } from './types.ts';
 
-export interface ActorDecision { act: boolean; model: string; inactivity?: InactivityMode }
+export interface ActorDecision { act: boolean; model: string; inactivity?: InactivityMode; decisionApi?: DecisionApi }
 export interface Director {
-	chooseAppearance?(state: Record<string, unknown>, outfits: OutfitOption[]): Promise<{ outfitId: string; model: string }>;
+	chooseAppearance?(state: Record<string, unknown>, outfits: OutfitOption[]): Promise<{ outfitId: string; model: string; decisionApi?: DecisionApi }>;
 	reflect(state: Record<string, unknown>, context: ReflectionContext): Promise<CharacterReflection>;
 	decide(state: Record<string, unknown>): Promise<ActorDecision>;
 	perform(state: Record<string, unknown>, actions: StageAction[], writingStyle?: string, previousAction?: WitnessedEvent): Promise<ActorPerformance>;
@@ -101,7 +101,7 @@ export async function resolveTurn(original: World, request: PlayerRequest, direc
 			}
 			checkpoint();
 			if (execution.nextInput?.(progress.consumedInputs)) continue;
-			applyAppearance(dressingActor, template, draft, selected.outfitId, selected.model);
+			applyAppearance(dressingActor, template, draft, selected.outfitId, selected.model, selected.decisionApi);
 			execution.onProgress?.(draft, progress);
 			continue;
 		}
@@ -172,10 +172,10 @@ export async function resolveTurn(original: World, request: PlayerRequest, direc
 				// Older directors represented non-participation as watching. New model calls always specify a mode.
 				const mode = decision.inactivity ?? 'watch';
 				if (!inactivityModes.includes(mode)) throw new Error('비참여 선택이 올바르지 않습니다.');
-				actor.inactivity = { mode, tick: draft.state.tick, model: decision.model };
+				actor.inactivity = { mode, tick: draft.state.tick, model: decision.model, ...(decision.decisionApi ? { decisionApi: decision.decisionApi } : {}) };
 				if (mode === 'watch') {
 					const wait = actions.find((action) => action.kind === 'wait')!;
-					applyAction(draft, actor.id, wait, '주변을 지켜본다.', { model: decision.model, choice: 'watch', acted: false });
+					applyAction(draft, actor.id, wait, '주변을 지켜본다.', { model: decision.model, choice: 'watch', acted: false, ...(decision.decisionApi ? { decisionApi: decision.decisionApi } : {}) });
 				}
 			} else {
 				const candidates = actions.filter((action) => action.kind !== 'wait');
@@ -194,10 +194,10 @@ export async function resolveTurn(original: World, request: PlayerRequest, direc
 				const expression = checkedExpression(output, candidates);
 				const action = candidates.find((candidate) => candidate.id === expression.actionId)!;
 				if (isExactRepeat(previousAction, actor.id, actor.sceneId, action, expression)) {
-					actor.inactivity = { mode: 'idle', tick: draft.state.tick, model: decision.model };
+					actor.inactivity = { mode: 'idle', tick: draft.state.tick, model: decision.model, ...(decision.decisionApi ? { decisionApi: decision.decisionApi } : {}) };
 				} else {
 						const text = bodyParts(expression).map((part) => part.text).join('\n') || action.label;
-					applyAction(draft, actor.id, action, text, { model: decision.model, choice: action.id, acted: true, generationModel: model }, expression);
+					applyAction(draft, actor.id, action, text, { model: decision.model, choice: action.id, acted: true, generationModel: model, ...(decision.decisionApi ? { decisionApi: decision.decisionApi } : {}) }, expression);
 					delete actor.inactivity;
 					if (expression.memoUpdate) actor.memo = expression.memoUpdate;
 				}

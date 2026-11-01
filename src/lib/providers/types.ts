@@ -1,14 +1,19 @@
+import type { DecisionApi } from '../theater/types.ts';
+
 export type ProviderKind = 'oev' | 'openai-compatible';
+export const decisionApiFor = (provider: { kind: ProviderKind; decisionApi?: DecisionApi | 'none' }): DecisionApi | 'none' => provider.decisionApi ?? (provider.kind === 'oev' ? 'systemone' : 'none');
 export interface ModelAlias {
 	id: string;
 	label: string;
 	modelId: string;
-	task: 'generation' | 'embedding';
+	task: 'generation' | 'decision' | 'embedding';
 }
 export interface PublicProvider {
 	id: string;
 	label: string;
 	kind: ProviderKind;
+	decisionApi: DecisionApi | 'none';
+	decisionMaxChoices: number;
 	baseUrl: string;
 	apiKeyEnv: string;
 	apiKeyConfigured: boolean;
@@ -25,4 +30,6 @@ export interface ModelOption {
 	providerLabel: string;
 	modelId: string;
 	decision: boolean;
+	generation: boolean;
+	decisionApi?: DecisionApi;
 }

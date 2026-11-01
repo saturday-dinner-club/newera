@@ -3,8 +3,8 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { aliasReference, getProviders, saveProvider, deleteProvider, resolveProviderModel, resolveProviderSnapshot } from '../src/lib/server/providers.ts';
-import { createDirector, createEmbedder, discoverProviderModels, getModelCatalog, modelSettings } from '../src/lib/server/oev.ts';
+import { aliasReference, getProviders, saveProvider, deleteProvider, resolveProviderModel, resolveProviderSnapshot, checkedProviderSnapshot } from '../src/lib/server/providers.ts';
+import { createDirector, createEmbedder, createImageDirector, discoverProviderModels, getModelCatalog, refreshModelCatalog, modelSettings } from '../src/lib/server/oev.ts';
 
 const defaults = { baseUrl: 'http://legacy.test/v1' };
 function environment(t) {
@@ -27,6 +27,9 @@ function fakeProvider() {
 		if (String(url).endsWith('/models')) return json({ data: [{ id: 'gemma4-26b', task: 'generation' }, { id: 'embeddinggemma2', task: 'embedding' }] });
 		if (String(url).endsWith('/embeddings')) return json({ model: body.model, data: body.input.map((_, index) => ({ index, embedding: [1, 0] })) });
 		if (body.questions) {
+			if (Array.isArray(body.questions)) {
+				return json({ model: body.model, answers: body.questions.map(question => ({ name: question.name, type: 'choice', choice: question.name === 'identity_check' ? 'consistent' : question.name === 'performance_check' ? 'accept' : question.name === 'inactivity' ? 'idle' : question.name === 'image_generation' ? 'skip' : question.name === 'outfit' ? question.choices[0].value : 'act' })), usage: { input_tokens: 12, output_tokens: 0, total_tokens: 12 } });
+			}
 			const key = Object.keys(body.questions)[0];
 			return json({ answers: { [key]: { type: 'choice', choice: key === 'identity_check' ? 'consistent' : key === 'performance_check' ? 'accept' : 'act' } } });
 		}
@@ -151,4 +154,139 @@ test('provider error bodies and logs never disclose the configured credential', 
 	globalThis.fetch = async () => new Response('invalid super-secret', { status: 401 });
 	const director = await createDirector(new AbortController().signal, selection);
 	await assert.rejects(director.decide(state), error => !error.message.includes('super-secret') && error.message.includes('[redacted]'));
+});
+
+test('catalog refresh imports compatible server models, preserves authored aliases and works alongside failed providers', async (t) => {
+	environment(t);
+	add(config('geniex', 'openai-compatible', { decisionApi: 'decision', models: [{ id: 'custom', label: '내 판단 모델', modelId: 'judge', task: 'decision' }] }));
+	add(config('offline', 'openai-compatible', { apiKey: 'private-key' }));
+	globalThis.fetch = async url => {
+		if (String(url).includes('offline.test')) return new Response('private-key', { status: 401 });
+		if (String(url).includes('geniex.test')) return new Response(JSON.stringify({ data: [{ id: 'judge' }, { id: 'writer' }, { id: 'writer' }] }));
+		return new Response(JSON.stringify({ data: [{ id: 'legacy', task: 'generation' }] }));
+	};
+	assert.ok(!(await getModelCatalog(AbortSignal.timeout(1000))).options.some(option => option.providerId === 'geniex' && option.modelId === 'writer'));
+	const catalog = await refreshModelCatalog(AbortSignal.timeout(1000));
+	const saved = getProviders(defaults).providers.find(provider => provider.id === 'geniex');
+	assert.deepEqual(saved.models[0], { id: 'custom', label: '내 판단 모델', modelId: 'judge', task: 'decision' });
+	assert.equal(saved.models.length, 2);
+	const writer = catalog.options.find(option => option.providerId === 'geniex' && option.modelId === 'writer');
+	assert.ok(writer.decision && writer.generation);
+	assert.equal(resolveProviderModel(defaults, writer.value, 'generation').model, 'writer');
+	assert.ok(catalog.errors.some(error => error.includes('offline')));
+	assert.ok(!JSON.stringify(catalog).includes('private-key'));
+	const revision = getProviders(defaults).revision;
+	await refreshModelCatalog(AbortSignal.timeout(1000));
+	assert.equal(getProviders(defaults).revision, revision);
+	assert.deepEqual(getProviders(defaults).providers.find(provider => provider.id === 'geniex').models, saved.models);
+});
+
+test('catalog refresh never overwrites provider edits made while discovery is running', async (t) => {
+	environment(t);
+	add(config('geniex', 'openai-compatible', { models: [] }));
+	let started, release;
+	const pending = new Promise(done => { started = done; });
+	const gate = new Promise(done => { release = done; });
+	globalThis.fetch = async url => {
+		if (String(url).includes('geniex.test')) { started(); await gate; }
+		return new Response(JSON.stringify({ data: [{ id: 'old-server-model', task: 'generation' }] }));
+	};
+	const refreshing = refreshModelCatalog(AbortSignal.timeout(1000));
+	await pending;
+	add(config('geniex', 'openai-compatible', { baseUrl: 'http://new-server.test/v1', models: [] }));
+	release();
+	const catalog = await refreshing;
+	assert.equal(getProviders(defaults).providers.find(provider => provider.id === 'geniex').models.length, 0);
+	assert.ok(catalog.errors.some(error => error.includes('geniex') && error.includes('변경')));
+});
+
+function decisionProviders(t) {
+	environment(t);
+	add(config('judge', 'openai-compatible', { decisionApi: 'decision', apiKey: 'judge-key', models: [{ id: 'luna', label: 'Luna', modelId: 'gpt-6-luna', task: 'decision' }] }));
+	add(config('writer', 'openai-compatible'));
+	return { decisionModel: 'judge::luna', textModel: 'writer::fast' };
+}
+
+test('Luna and Geniex decision routes coexist with legacy System One and pin protocol and endpoint across provider edits', (t) => {
+	const selection = decisionProviders(t);
+	const pinned = resolveProviderSnapshot(defaults, selection);
+	assert.equal(pinned.decision.decisionApi, 'decision');
+	assert.equal(resolveProviderModel(defaults, 'gemma4-26b', 'decision').decisionApi, 'systemone');
+	assert.throws(() => resolveProviderModel(defaults, 'judge::luna', 'generation'), /용도/);
+	add(config('judge', 'openai-compatible', { decisionApi: 'systemone' }));
+	assert.equal(resolveProviderModel(defaults, 'judge::fast', 'decision').decisionApi, 'systemone');
+	assert.equal(checkedProviderSnapshot(JSON.parse(JSON.stringify(pinned))).decision.decisionApi, 'decision');
+	const legacy = structuredClone(pinned);
+	legacy.decision.kind = 'oev'; delete legacy.decision.decisionApi;
+	assert.equal(checkedProviderSnapshot(legacy).decision.decisionApi, 'systemone');
+	assert.throws(() => checkedProviderSnapshot({ ...pinned, decision: { ...pinned.decision, decisionApi: 'invalid' } }), /API 유형/);
+});
+
+test('Decision API routes participation, identity review, performance review and image checks through named choices', async (t) => {
+	const selection = decisionProviders(t), calls = fakeProvider();
+	const director = await createDirector(new AbortController().signal, selection);
+	assert.deepEqual(await director.decide(state), { act: true, model: 'judge::luna', decisionApi: 'decision' });
+	await director.perform(state, actions);
+	assert.equal(await createImageDirector(selection, new AbortController().signal).shouldGenerate({ scene: 'Synthetic stage', gameTime: { day: 1, hour: 18, minute: 0, tick: 1 }, imageGeneration: { conditions: 'Only important scenes.', promptFormat: 'natural', promptInstructions: '' }, objectStates: [] }), false);
+	const decisions = calls.filter(call => call.url.endsWith('/decisions'));
+	assert.deepEqual(decisions.map(call => call.body.questions[0].name), ['participation', 'identity_check', 'performance_check', 'image_generation']);
+	assert.ok(decisions.every(call => call.headers.authorization === 'Bearer judge-key' && call.body.model === 'gpt-6-luna' && typeof call.body.input === 'string' && !('state' in call.body)));
+	assert.deepEqual(decisions[0].body.questions[0].choices.map(choice => choice.value), ['act', 'wait']);
+	assert.ok(calls.some(call => call.url.startsWith('http://writer.test/') && call.url.endsWith('/chat/completions')));
+	assert.ok(!calls.some(call => call.url.endsWith('/systemone')));
+});
+
+test('Decision API inactivity remains a separate question and a one-outfit wardrobe needs no unsupported one-choice request', async (t) => {
+	const selection = decisionProviders(t), calls = fakeProvider(), original = globalThis.fetch;
+	globalThis.fetch = async (url, init) => {
+		const response = await original(url, init), body = JSON.parse(init.body);
+		if (body.questions?.[0]?.name === 'participation') return new Response(JSON.stringify({ answers: [{ type: 'choice', name: 'participation', choice: 'wait' }] }));
+		return response;
+	};
+	const director = await createDirector(new AbortController().signal, selection);
+	assert.deepEqual(await director.decide(state), { act: false, inactivity: 'idle', model: 'judge::luna', decisionApi: 'decision' });
+	assert.deepEqual(calls.map(call => call.body.questions[0].name), ['participation', 'inactivity']);
+	const before = calls.length;
+	assert.deepEqual(await director.chooseAppearance(state, [{ id: 'coat', name: '외투', appearance: '회색 외투', context: '추운 날' }]), { outfitId: 'coat', model: 'judge::luna', decisionApi: 'decision' });
+	assert.equal(calls.length, before);
+});
+
+test('Decision API logs protocol and input usage without logging credentials or observation content', async (t) => {
+	const selection = decisionProviders(t), logs = [];
+	t.mock.method(console, 'info', message => { try { logs.push(JSON.parse(message)); } catch {} });
+	fakeProvider();
+	const director = await createDirector(new AbortController().signal, selection);
+	await director.decide({ ...state, privateContext: 'private-observation-never-log' });
+	const response = logs.find(log => log.event === '[OEV] HTTP 응답 수신');
+	assert.equal(response.decisionApi, 'decision');
+	assert.equal(response.question, 'participation');
+	assert.equal(response.promptTokens, 12);
+	assert.equal(response.completionTokens, 0);
+	assert.ok(!JSON.stringify(logs).includes('judge-key'));
+	assert.ok(!JSON.stringify(logs).includes('private-observation-never-log'));
+});
+
+test('Decision API refusal is terminal while invalid names, types and candidates cannot become actions', async (t) => {
+	const selection = decisionProviders(t);
+	const previousRetries = process.env.NEWERA_MAX_RETRIES;
+	process.env.NEWERA_MAX_RETRIES = '0';
+	t.after(() => { if (previousRetries === undefined) delete process.env.NEWERA_MAX_RETRIES; else process.env.NEWERA_MAX_RETRIES = previousRetries; });
+	for (const answer of [{ type: 'refusal', name: 'participation' }, { type: 'choice', name: 'wrong', choice: 'act' }, { type: 'predicate', name: 'participation', probability: 1 }, { type: 'choice', name: 'participation', choice: 'invented' }]) {
+		let calls = 0;
+		globalThis.fetch = async () => { calls++; return new Response(JSON.stringify({ answers: [answer] })); };
+		const director = await createDirector(new AbortController().signal, selection);
+		await assert.rejects(director.decide(state));
+		assert.equal(calls, 1);
+	}
+});
+
+test('decision-only Luna aliases appear only among decision options and discovery recognizes the model purpose', async (t) => {
+	decisionProviders(t); fakeProvider();
+	const catalog = await getModelCatalog(new AbortController().signal);
+	const luna = catalog.options.find(option => option.value === 'judge::luna');
+	assert.equal(luna.decision, true);
+	assert.equal(luna.generation, false);
+	assert.equal(luna.decisionApi, 'decision');
+	globalThis.fetch = async () => new Response(JSON.stringify({ data: [{ id: 'gpt-6-luna' }] }));
+	assert.deepEqual((await discoverProviderModels('judge', new AbortController().signal)).models, [{ id: 'gpt-6-luna', task: 'decision' }]);
 });

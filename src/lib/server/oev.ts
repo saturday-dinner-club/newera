@@ -8,8 +8,10 @@ import { checkedExpression, isExactRepeat, performanceSchema } from '$lib/theate
 import { reflectionSchema } from '$lib/theater/reflection';
 import { checkedModelSelection, checkedReflection, record, text } from '$lib/theater/validation';
 import { InferenceError, RetryableError, withRetries, type RetryPolicy } from './retry';
-import { aliasReference, providerCatalogRoute, providerRegistry, resolveProviderModel, resolveProviderSnapshot, type ProviderRoute, type ProviderSnapshot } from './providers';
+import { aliasReference, providerCatalogRoute, providerRegistry, resolveProviderModel, resolveProviderSnapshot, saveProvider, type ProviderRoute, type ProviderSnapshot } from './providers';
 import type { ModelOption } from '$lib/providers/types';
+import { decisionApiFor } from '$lib/providers/types';
+import { decisionAnswer, decisionRequest } from './decision-api';
 import type { ImageJudgmentInput } from '$lib/images/triggers';
 import { logInference, withInferenceLogContext, type InferenceDiagnostic } from './inference-log';
 import { generationRetryGuidance, imagePromptSystemPrompt, performanceSpeakerInstructions, performanceSystemPrompt, reflectionSystemPrompt, relationshipKnowledgeInstructions } from './prompts';
@@ -82,6 +84,7 @@ export function modelSettings(): Settings {
 function providerBody(route: ProviderRoute, path: string, input: unknown): unknown {
 	if (input === undefined) return undefined;
 	const body: Record<string, unknown> = { ...record(input, 'Provider 요청'), model: route.model };
+	if (path === '/systemone' && decisionApiFor(route) === 'decision') return decisionRequest(body, route.decisionMaxChoices ?? 255);
 	if (route.kind === 'openai-compatible') {
 		delete body.input_type;
 		if (path === '/chat/completions') {
@@ -101,6 +104,7 @@ type Fields = Record<string, unknown>;
 const fields = (value: unknown): Fields => value && typeof value === 'object' && !Array.isArray(value) ? value as Fields : {};
 const tokenCount = (value: unknown): number | undefined => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
 interface ResponseSummary {
+	answerCount: number;
 	finishReason: string | null;
 	choiceCount: number;
 	contentChars?: number;
@@ -113,6 +117,7 @@ interface ResponseSummary {
 }
 interface ResponseInfo {
 	requestId: string; providerId: string; providerLabel: string; model: string; outputTokenLimit?: number; schema?: string;
+	decisionApi?: 'systemone' | 'decision'; questionNames?: string[];
 	summary: ResponseSummary; sanitize: (message: string) => string;
 }
 const responseInfo = new WeakMap<Fields, ResponseInfo>();
@@ -124,9 +129,9 @@ function responseSummary(response: Fields, sanitize: (message: string) => string
 	const reasoning = message.reasoning_content ?? message.reasoning;
 	return {
 		finishReason: finish == null ? null : typeof finish === 'string' && /^[a-zA-Z0-9_.:-]{1,64}$/.test(finish) ? sanitize(finish) : 'invalid',
-		choiceCount: choices.length, contentChars: typeof message.content === 'string' ? message.content.length : undefined,
-		reasoningChars: typeof reasoning === 'string' ? reasoning.length : undefined, refusal: !!message.refusal,
-		promptTokens: tokenCount(usage.prompt_tokens), completionTokens: tokenCount(usage.completion_tokens), totalTokens: tokenCount(usage.total_tokens), reasoningTokens: tokenCount(fields(usage.completion_tokens_details).reasoning_tokens)
+		choiceCount: choices.length, answerCount: Array.isArray(response.answers) ? response.answers.length : Object.keys(fields(response.answers)).length, contentChars: typeof message.content === 'string' ? message.content.length : undefined,
+		reasoningChars: typeof reasoning === 'string' ? reasoning.length : undefined, refusal: !!message.refusal || (Array.isArray(response.answers) && response.answers.some(answer => fields(answer).type === 'refusal')),
+		promptTokens: tokenCount(usage.prompt_tokens ?? usage.input_tokens), completionTokens: tokenCount(usage.completion_tokens ?? usage.output_tokens), totalTokens: tokenCount(usage.total_tokens), reasoningTokens: tokenCount(fields(usage.completion_tokens_details ?? usage.output_tokens_details).reasoning_tokens)
 	};
 }
 function outputDiagnostic(response: Fields, stage: string, code: string, reason: string): InferenceDiagnostic {
@@ -138,7 +143,7 @@ function outputDiagnostic(response: Fields, stage: string, code: string, reason:
 		unexpectedFieldCount: Object.keys(parsed).filter((key) => !expected.includes(key)).length,
 		fieldTypes: Object.fromEntries(expected.filter((key) => Object.hasOwn(parsed, key)).map((key) => [key, parsed[key] === null ? 'null' : Array.isArray(parsed[key]) ? 'array' : typeof parsed[key]]))
 	} : {};
-	return { requestId: info?.requestId, providerId: info?.providerId, providerLabel: info?.providerLabel, model: info?.model, outputTokenLimit: info?.outputTokenLimit, ...info?.summary, ...shape, stage, code, reason: info?.sanitize(reason) ?? reason.slice(0, 400) };
+	return { requestId: info?.requestId, providerId: info?.providerId, providerLabel: info?.providerLabel, model: info?.model, decisionApi: info?.decisionApi, outputTokenLimit: info?.outputTokenLimit, ...info?.summary, ...shape, stage, code, reason: info?.sanitize(reason) ?? reason.slice(0, 400) };
 }
 function outputError(response: Fields, stage: string, code: string, reason: string): RetryableError {
 	const diagnostic = outputDiagnostic(response, stage, code, reason);
@@ -152,32 +157,37 @@ function rejectOutput(response: Fields, stage: string, code: string, reason: str
 
 async function request(settings: Settings, path: string, signal: AbortSignal, body?: unknown, target?: ProviderRoute): Promise<Record<string, unknown>> {
 	const route = target ?? resolveProviderModel(settings, '', 'generation');
+	const api = path === '/systemone' ? decisionApiFor(route) : undefined;
+	if (api === 'none') throw new Error('이 Provider에는 판단 API가 설정되지 않았습니다.');
+	const decisionApi = api === 'systemone' || api === 'decision' ? api : undefined;
+	const actualPath = decisionApi === 'decision' ? '/decisions' : path;
 	const label = route.providerId === 'default' ? 'OEV' : route.providerLabel;
 	const timeoutMs = path === '/embeddings' ? settings.embeddingTimeoutMs : path === '/chat/completions' ? settings.timeoutMs : settings.decisionTimeoutMs;
 	const timed = AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]);
 	const outgoing = body === undefined ? undefined : fields(providerBody(route, path, body));
 	const payload = outgoing === undefined ? undefined : JSON.stringify(outgoing);
-	const endpoint = new URL(`${route.baseUrl}${path}`);
+	const endpoint = new URL(`${route.baseUrl}${actualPath}`);
 	endpoint.username = ''; endpoint.password = ''; endpoint.search = ''; endpoint.hash = '';
 	const schema = fields(fields(fields(body).response_format).json_schema).name;
 	const responseFormat = fields(outgoing?.response_format).type;
-	const question = Object.keys(fields(outgoing?.questions))[0];
+	const questionNames = Object.keys(fields(fields(body).questions));
+	const question = questionNames[0];
 	const outputTokenLimit = tokenCount(outgoing?.max_completion_tokens ?? outgoing?.max_tokens);
 	const sanitize = (message: string) => (route.apiKey ? message.replaceAll(route.apiKey, '[redacted]') : message).replace(/[\r\n\t]/g, ' ').slice(0, 400);
-	const metadata = { requestId: randomUUID(), providerId: route.providerId, providerLabel: sanitize(route.providerLabel), model: sanitize(route.model), method: body === undefined ? 'GET' : 'POST', endpoint: endpoint.toString(), schema: typeof schema === 'string' ? schema : undefined, responseFormat: typeof responseFormat === 'string' ? responseFormat : undefined, question, outputTokenLimit, bytes: Buffer.byteLength(payload ?? ''), timeoutMs };
+	const metadata = { requestId: randomUUID(), providerId: route.providerId, providerLabel: sanitize(route.providerLabel), providerKind: route.kind, decisionApi, model: sanitize(route.model), method: body === undefined ? 'GET' : 'POST', endpoint: endpoint.toString(), schema: typeof schema === 'string' ? schema : undefined, responseFormat: typeof responseFormat === 'string' ? responseFormat : undefined, question, outputTokenLimit, bytes: Buffer.byteLength(payload ?? ''), timeoutMs };
 	const started = Date.now();
 	let status: number | null = null;
 	let responseBytes = 0;
 	// Log the transport boundary without exposing character observations, chat or model output.
 	logInference('info', '[OEV] 요청 시작', metadata);
 	try {
-		const response = await fetch(`${route.baseUrl}${path}`, {
+		const response = await fetch(`${route.baseUrl}${actualPath}`, {
 			method: body === undefined ? 'GET' : 'POST', headers: { 'content-type': 'application/json', ...(route.apiKey ? { authorization: `Bearer ${route.apiKey}` } : {}) }, body: payload, signal: timed
 		});
 		status = response.status;
 		if (!response.ok) {
 			const detail = await response.text();
-			const message = `${label} ${path} 오류 ${response.status}: ${(route.apiKey ? detail.replaceAll(route.apiKey, '[redacted]') : detail).slice(0, 300)}`;
+			const message = `${label} ${actualPath} 오류 ${response.status}: ${(route.apiKey ? detail.replaceAll(route.apiKey, '[redacted]') : detail).slice(0, 300)}`;
 			const diagnostic = { ...metadata, stage: 'transport', code: `http_${response.status}`, reason: `Provider가 HTTP ${response.status} 오류를 반환했습니다.` };
 			if ([408, 429, 500, 502, 503, 504].includes(response.status)) throw new RetryableError(message, diagnostic);
 			throw new InferenceError(message, diagnostic);
@@ -186,14 +196,14 @@ async function request(settings: Settings, path: string, signal: AbortSignal, bo
 		responseBytes = Buffer.byteLength(raw);
 		const result = record(JSON.parse(raw), `OEV ${path} 응답`);
 		const summary = responseSummary(result, sanitize);
-		responseInfo.set(result, { requestId: metadata.requestId, providerId: route.providerId, providerLabel: metadata.providerLabel, model: metadata.model, schema: metadata.schema, outputTokenLimit, summary, sanitize });
+		responseInfo.set(result, { requestId: metadata.requestId, providerId: route.providerId, providerLabel: metadata.providerLabel, model: metadata.model, decisionApi, questionNames, schema: metadata.schema, outputTokenLimit, summary, sanitize });
 		logInference('info', '[OEV] HTTP 응답 수신', { ...metadata, status, elapsedMs: Date.now() - started, responseBytes, ...summary });
 		return result;
 	} catch (error) {
 		const reason = signal.aborted ? 'cancelled' : timed.aborted ? 'timeout' : error instanceof TypeError ? 'connection' : status === null ? 'request' : 'response';
 		logInference(signal.aborted ? 'info' : 'warn', '[OEV] 요청 실패', { ...metadata, status, elapsedMs: Date.now() - started, responseBytes, reason });
 		signal.throwIfAborted();
-		const diagnostic = { requestId: metadata.requestId, providerId: route.providerId, providerLabel: metadata.providerLabel, model: metadata.model, stage: 'transport' };
+		const diagnostic = { requestId: metadata.requestId, providerId: route.providerId, providerLabel: metadata.providerLabel, model: metadata.model, decisionApi, stage: 'transport' };
 		if (timed.aborted) throw new RetryableError(`${label} ${path} 응답 대기 시간(${timeoutMs / 1000}초)이 초과되었습니다.`, { ...diagnostic, code: 'timeout', reason: '개별 HTTP 요청의 대기 시간이 초과되었습니다.' });
 		if (error instanceof TypeError) throw new RetryableError(`${label} ${path} 연결에 실패했습니다.`, { ...diagnostic, code: 'connection', reason: 'Provider 연결에 실패했습니다.' });
 		if (error instanceof SyntaxError) throw new RetryableError(`${label} ${path} 응답이 올바른 JSON이 아닙니다.`, { ...diagnostic, code: 'http_invalid_json', reason: 'HTTP 응답 본문이 유효한 JSON이 아닙니다.' });
@@ -236,7 +246,7 @@ function generatedOutput<T>(parse: () => T, response: Fields, stage: string): T 
 		logInference('info', '[추론] 출력 검증 통과', { requestId: info?.requestId, providerId: info?.providerId, providerLabel: info?.providerLabel, model: info?.model, stage, code: 'valid_output' });
 		return value;
 	} catch (error) {
-		const failure = error instanceof RetryableError && error.diagnostic ? error : outputError(response, stage, 'invalid_output', error instanceof Error ? error.message : '모델 출력 형식이 올바르지 않습니다.');
+		const failure = error instanceof InferenceError && error.diagnostic ? error : outputError(response, stage, 'invalid_output', error instanceof Error ? error.message : '모델 출력 형식이 올바르지 않습니다.');
 		logInference('warn', '[추론] 출력 검증 실패', { ...failure.diagnostic });
 		throw failure;
 	}
@@ -304,7 +314,9 @@ export function createImageDirector(models: ModelSelection, signal: AbortSignal)
 }
 
 function answer(response: Record<string, unknown>, key: string, type: string): Record<string, unknown> {
-	const entry = record(record(response.answers, 'answers')[key], `answers.${key}`);
+	const info = responseInfo.get(response);
+	const entry = info?.decisionApi === 'decision' ? decisionAnswer(response, key, info.questionNames ?? [key]) : record(record(response.answers, 'answers')[key], `answers.${key}`);
+	if (entry.type === 'refusal') throw new InferenceError('판단 API가 이 질문에 대한 응답을 거절했습니다.', outputDiagnostic(response, 'typed_answer', 'decision_refusal', '판단 API가 질문에 대한 응답을 거절했습니다.'));
 	if (entry.type !== type) throw new Error(`OEV ${key} 응답의 타입이 올바르지 않습니다.`);
 	return entry;
 }
@@ -318,12 +330,16 @@ async function generationModels(settings: Settings, signal: AbortSignal, checkpo
 export async function getModelCatalog(signal: AbortSignal): Promise<{ models: string[]; defaults: ModelSelection; options: ModelOption[]; errors: string[] }> {
 	const settings = modelSettings();
 	const registry = providerRegistry(settings);
-	const options: ModelOption[] = registry.providers.flatMap((owner) => owner.models.filter((alias) => alias.task === 'generation').map((alias) => ({ value: aliasReference(owner.id, alias.id), label: alias.label, providerId: owner.id, providerLabel: owner.label, modelId: alias.modelId, decision: owner.kind === 'oev' })));
+	const options: ModelOption[] = registry.providers.flatMap((owner) => owner.models.filter((alias) => alias.task !== 'embedding').map((alias) => {
+		const api = decisionApiFor(owner);
+		return { value: aliasReference(owner.id, alias.id), label: alias.label, providerId: owner.id, providerLabel: owner.label, modelId: alias.modelId, decision: api !== 'none', generation: alias.task === 'generation', ...(api !== 'none' ? { decisionApi: api } : {}) };
+	}));
 	const errors: string[] = [];
 	try {
 		const route = resolveProviderModel(settings, '', 'generation', registry);
 		const models = await generationModels(settings, signal, () => {}, route);
-		options.unshift(...models.map((id) => ({ value: id, label: id, providerId: route.providerId, providerLabel: route.providerLabel, modelId: id, decision: true })));
+		const api = decisionApiFor(route);
+		options.unshift(...models.map((id) => ({ value: id, label: id, providerId: route.providerId, providerLabel: route.providerLabel, modelId: id, decision: api !== 'none', generation: true, ...(api !== 'none' ? { decisionApi: api } : {}) })));
 	} catch (error) {
 		signal.throwIfAborted();
 		if (!options.length) throw error;
@@ -332,7 +348,7 @@ export async function getModelCatalog(signal: AbortSignal): Promise<{ models: st
 	return { models: options.map((option) => option.value), options, errors, defaults: { decisionModel: settings.decisionModel, textModel: settings.textModel } };
 }
 
-export async function discoverProviderModels(id: string, signal: AbortSignal): Promise<{ models: { id: string; task: 'generation' | 'embedding' }[] }> {
+export async function discoverProviderModels(id: string, signal: AbortSignal): Promise<{ models: { id: string; task: 'generation' | 'decision' | 'embedding' }[] }> {
 	const settings = modelSettings();
 	const route = providerCatalogRoute(settings, id);
 	const catalog = await withRetries('Provider 모델 목록 조회', settings, signal, () => request(settings, '/models', signal, undefined, route));
@@ -340,8 +356,47 @@ export async function discoverProviderModels(id: string, signal: AbortSignal): P
 	return { models: catalog.data.flatMap((entry) => {
 		const model = record(entry, 'Provider 모델');
 		if (route.kind === 'oev' && model.task !== 'generation' && model.task !== 'embedding') return [];
-		return [{ id: text(model.id, '실제 모델 ID', 200), task: model.task === 'embedding' ? 'embedding' as const : 'generation' as const }];
+		const modelId = text(model.id, '실제 모델 ID', 200);
+		return [{ id: modelId, task: model.task === 'embedding' ? 'embedding' as const : model.task === 'decision' || (decisionApiFor(route) === 'decision' && modelId === 'gpt-6-luna') ? 'decision' as const : 'generation' as const }];
 	}) };
+}
+
+/** Explicit refresh imports new server models without replacing authored aliases or selected references. */
+export async function refreshModelCatalog(signal: AbortSignal): ReturnType<typeof getModelCatalog> {
+	const settings = modelSettings();
+	const providers = providerRegistry(settings).providers.filter(provider => provider.id !== 'default');
+	const results = await Promise.allSettled(providers.map(provider => discoverProviderModels(provider.id, signal)));
+	signal.throwIfAborted();
+	const errors: string[] = [];
+	for (const [index, result] of results.entries()) {
+		const original = providers[index];
+		if (result.status === 'rejected') {
+			errors.push(`${original.label}: ${result.reason instanceof Error ? result.reason.message : '서버 모델 목록을 가져오지 못했습니다.'}`);
+			continue;
+		}
+		const registry = providerRegistry(settings);
+		const current = registry.providers.find(provider => provider.id === original.id);
+		// A provider edited during discovery must be refreshed again, never overwritten by this result.
+		if (!current || JSON.stringify(current) !== JSON.stringify(original)) {
+			errors.push(`${original.label}: 조회 중 설정이 변경되었습니다. 목록을 다시 새로고침해 주세요.`);
+			continue;
+		}
+		const known = new Set(current.models.map(model => model.modelId));
+		const fresh = result.value.models.filter(model => {
+			if (known.has(model.id)) return false;
+			known.add(model.id);
+			return true;
+		});
+		if (!fresh.length) continue;
+		const additions = fresh.slice(0, 100 - current.models.length).map(model => ({ id: randomUUID(), label: model.id.slice(0, 100), modelId: model.id, task: model.task }));
+		if (additions.length < fresh.length) errors.push(`${original.label}: 별칭은 최대 100개까지 등록할 수 있어 일부 모델을 추가하지 못했습니다.`);
+		if (additions.length) {
+			try { saveProvider(settings, registry.revision, { ...current, models: [...current.models, ...additions] }); }
+			catch (error) { errors.push(`${original.label}: ${error instanceof Error ? error.message : '조회한 모델을 저장하지 못했습니다.'}`); }
+		}
+	}
+	const catalog = await getModelCatalog(signal);
+	return { ...catalog, errors: [...errors, ...catalog.errors] };
 }
 
 export async function createDirector(signal: AbortSignal, models?: ModelSelection | null, checkpoint: () => void = () => {}, pinned?: ProviderSnapshot | null): Promise<Director> {
@@ -353,6 +408,11 @@ export async function createDirector(signal: AbortSignal, models?: ModelSelectio
 		if ((!decisionModel.includes('::') && !generation.includes(decisionModel)) || (!textModel.includes('::') && !generation.includes(textModel))) throw new Error('설정한 판단·생성 모델이 OEV generation 모델 목록에 없습니다.');
 	}
 	async function choose(label: string, key: string, state: Record<string, unknown>, instructions: string, criteria: Record<string, unknown>): Promise<string> {
+		if (decisionApiFor(routes.decision) === 'decision' && Object.keys(criteria).length === 1) {
+			const choice = Object.keys(criteria)[0];
+			logInference('info', '[추론] 단일 후보 선택', { providerId: routes.decision.providerId, decisionApi: 'decision', model: routes.decision.model, question: key, choice });
+			return choice;
+		}
 		return withRetries(label, settings, signal, async () => {
 			checkpoint();
 			const response = await request(settings, '/systemone', signal, { model: routes.decision.model, state, questions: { [key]: { type: 'choice', instructions, criteria } } }, routes.decision);
@@ -368,7 +428,7 @@ export async function createDirector(signal: AbortSignal, models?: ModelSelectio
 	const director: Director = {
 		async chooseAppearance(state, outfits) {
 			const outfitId = await choose('오늘의 옷차림 판단', 'outfit', outfitContext(state), '현재 장소·시각·옷 취향·후보의 착용 맥락으로 차림 하나를 고른다. appearanceSelection은 마지막 선택이다. 갈아입을 이유가 없으면 이전 후보를 유지한다. 아직 하지 않은 활동·이동이나 없는 옷을 만들지 않는다.', Object.fromEntries(outfits.map((outfit) => [outfit.id, { name: outfit.name, appearance: outfit.appearance, context: outfit.context }])));
-			return { outfitId, model: decisionModel };
+			return { outfitId, model: decisionModel, decisionApi: decisionApiFor(routes.decision) as 'systemone' | 'decision' };
 		},
 		async reflect(state, context) {
 			let corrections = 0;
@@ -396,9 +456,9 @@ export async function createDirector(signal: AbortSignal, models?: ModelSelectio
 		},
 		async decide(state): Promise<ActorDecision> {
 			const choice = await choose('행동 여부 판단', 'participation', participationContext(state), relationshipKnowledgeInstructions + ' 고정 화자는 identity.speakerName이다. recalledEvents는 검색한 오래된 목격 기억이지 이번에 새로 발생한 사건이 아니다. memorySearch 실패는 기억 부재를 뜻하지 않는다. 남이 player에게 한 질문에 플레이어 대신 답하지 않는다. 이미 플레이어에게 질문했고 답이 없으면 새로 끼어들 이유가 없는 한 기다린다. self의 성격·목표·현재 의도와 목격 사건으로 지금 새 말이나 행동을 할지만 고른다. actorId는 실제 주체, targetId는 대상이며 발언은 그 사람의 주장이다. 남의 행동·감정을 지어내지 않는다. 새 사건에는 다시 반응할 수 있지만 자기 발언을 의미 없이 반복하지 않는다. 중단 요청 수용도 자기 감정과 의도로 판단한다.', { act: '새 말이나 행동으로 참여한다.', wait: '새로 참여하지 않는다.' });
-			if (choice === 'act') return { act: true, model: decisionModel };
+			if (choice === 'act') return { act: true, model: decisionModel, decisionApi: decisionApiFor(routes.decision) as 'systemone' | 'decision' };
 			const inactivity = await choose('비참여 태도 판단', 'inactivity', inactivityContext(state), '새로 참여하지 않기로 했다. 주의를 기울여 지켜보면 watch, 실제로 이미 하던 일을 이어가면 continue, 활동하거나 주시하지 않으면 idle이다. 목표·계획만으로 하던 일이 있다고 가정하지 않는다. 이전 inactivity는 영구 지시가 아니다. 이동·작업 완료·시간 진행을 확정하지 않는다.', { watch: '주변을 주의 깊게 지켜본다.', continue: '실제로 이미 하던 일을 계속한다.', idle: '아무것도 하지 않는다.' });
-			return { act: false, inactivity: inactivity as InactivityMode, model: decisionModel };
+			return { act: false, inactivity: inactivity as InactivityMode, model: decisionModel, decisionApi: decisionApiFor(routes.decision) as 'systemone' | 'decision' };
 		},
 		async perform(state, actions, writingStyle = '', previousAction) {
 			const self = state.self as Record<string, unknown>;

@@ -28,7 +28,9 @@ const mutate: RequestHandler = async ({ request, url }) => {
 				if (typeof reference !== 'string' || !reference.startsWith(`${provider.id}::`)) continue;
 				const aliases = Array.isArray(provider.models) ? provider.models.map((model) => record(model, '모델 별칭')) : [];
 				const alias = aliases.find((model) => model.id === reference.split('::')[1]);
-				if (!alias || alias.task !== 'generation' || (role === 'decisionModel' && provider.kind !== 'oev')) throw new Error('세션에서 사용하는 모델 별칭입니다. 세션 모델을 먼저 변경한 뒤 별칭을 제거하거나 용도를 바꿔 주세요.');
+				const api = provider.decisionApi ?? (provider.kind === 'oev' ? 'systemone' : 'none');
+				const compatible = role === 'decisionModel' ? (alias?.task === 'generation' || alias?.task === 'decision') && (api === 'systemone' || api === 'decision') : alias?.task === 'generation';
+				if (!compatible) throw new Error('세션에서 사용하는 모델 별칭입니다. 세션 모델을 먼저 변경한 뒤 별칭을 제거하거나 용도를 바꿔 주세요.');
 			}
 		}
 		return json(saveProvider(settings, Number(body.revision), body.provider, body.clearApiKey === true), { headers });

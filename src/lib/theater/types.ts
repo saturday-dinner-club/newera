@@ -1,6 +1,8 @@
 export type Value = string | number | boolean | null;
 export type Properties = Record<string, Value>;
 export type EntityKind = 'character' | 'object';
+export type DecisionApi = 'systemone' | 'decision';
+export const decisionApiLabels: Record<DecisionApi, string> = { systemone: 'System One', decision: 'Decision API' };
 export type EventKind = 'speak' | 'act' | 'interact' | 'wait' | 'move' | 'enter' | 'leave' | 'change';
 
 export interface Condition { key: string; equals: Value }
@@ -21,7 +23,7 @@ export interface ObjectReaction {
 	text: string;
 }
 export interface OutfitOption { id: string; name: string; appearance: string; context: string }
-export interface AppearanceSelection { day: number; minute?: number; sceneId?: string; outfitId: string | null; model: string }
+export interface AppearanceSelection { day: number; minute?: number; sceneId?: string; outfitId: string | null; model: string; decisionApi?: DecisionApi }
 export interface ReactionProfile { baseSpeed: number; talkativeness: number }
 export interface EntityTemplate {
 	id: string;
@@ -133,7 +135,7 @@ export interface LegacyMemory {
 export const inactivityModes = ['watch', 'continue', 'idle'] as const;
 export type InactivityMode = typeof inactivityModes[number];
 export const inactivityLabels: Record<InactivityMode, string> = { watch: '지켜본다', continue: '하던 일을 계속한다', idle: '아무것도 하지 않는다' };
-export interface InactivitySelection { mode: InactivityMode; tick: number; model: string }
+export interface InactivitySelection { mode: InactivityMode; tick: number; model: string; decisionApi?: DecisionApi }
 export type EntityMemory = WitnessedEvent | LegacyMemory;
 export interface EntityInstance extends Spawn {
 	active: boolean;
@@ -165,6 +167,7 @@ export interface ActorExpression {
 export interface ActorPerformance extends ActorExpression { model: string }
 export interface DecisionTrace {
 	model: string;
+	decisionApi?: DecisionApi;
 	choice: string;
 	acted?: boolean;
 	generationModel?: string;

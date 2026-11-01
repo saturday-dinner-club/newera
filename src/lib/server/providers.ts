@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { ModelSelection } from '$lib/theater/types';
 import type { PublicProvider, ProviderView } from '$lib/providers/types';
+import { decisionApiFor } from '$lib/providers/types';
 import { record, text } from '$lib/theater/validation';
 
 interface Provider extends Omit<PublicProvider, 'apiKeyConfigured'> { apiKey: string }
@@ -12,6 +13,9 @@ export interface ProviderRoute {
 	providerId: string;
 	providerLabel: string;
 	kind: PublicProvider['kind'];
+	/** Missing fields in older saved jobs keep the original provider behavior. */
+	decisionApi?: PublicProvider['decisionApi'];
+	decisionMaxChoices?: number;
 	baseUrl: string;
 	model: string;
 	apiKey: string;
@@ -32,6 +36,10 @@ function provider(input: unknown): Provider {
 	const row = record(input, 'Provider');
 	const kind = row.kind;
 	if (kind !== 'oev' && kind !== 'openai-compatible') throw new Error('Provider 유형이 올바르지 않습니다.');
+	const decisionApi = row.decisionApi ?? (kind === 'oev' ? 'systemone' : 'none');
+	if (!['systemone', 'decision', 'none'].includes(String(decisionApi))) throw new Error('판단 API 유형이 올바르지 않습니다.');
+	const decisionMaxChoices = row.decisionMaxChoices ?? 255;
+	if (!Number.isSafeInteger(decisionMaxChoices) || Number(decisionMaxChoices) < 2 || Number(decisionMaxChoices) > 255) throw new Error('Decision API 후보 한도는 2~255의 정수여야 합니다.');
 	const url = new URL(text(row.baseUrl, 'Provider API 주소', 2000));
 	if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash) throw new Error('API 주소에는 http/https 주소를 쓰고 인증 정보·쿼리·해시는 제외해 주세요.');
 	const apiKeyEnv = text(row.apiKeyEnv ?? '', 'API 키 환경 변수', 200, true);
@@ -39,17 +47,18 @@ function provider(input: unknown): Provider {
 	if (!Array.isArray(row.models) || row.models.length > 100) throw new Error('모델 별칭은 최대 100개까지 등록할 수 있습니다.');
 	const models: PublicProvider['models'] = row.models.map((entry) => {
 		const model = record(entry, '모델 별칭');
-		if (model.task !== 'generation' && model.task !== 'embedding') throw new Error('모델 용도가 올바르지 않습니다.');
+		if (model.task !== 'generation' && model.task !== 'decision' && model.task !== 'embedding') throw new Error('모델 용도가 올바르지 않습니다.');
 		return { id: identifier(model.id, '별칭 ID'), label: text(model.label, '모델 별칭', 100), modelId: text(model.modelId, '실제 모델 ID', 200), task: model.task };
 	});
 	if (new Set(models.map((model) => model.id)).size !== models.length) throw new Error('모델 별칭 ID가 중복되었습니다.');
+	if (decisionApi === 'none' && models.some(model => model.task === 'decision')) throw new Error('판단 전용 모델을 등록하려면 판단 API를 선택해 주세요.');
 	const outputTokenParameter = row.outputTokenParameter ?? 'max_completion_tokens';
 	const structuredOutput = row.structuredOutput ?? 'json_schema';
 	if (outputTokenParameter !== 'max_tokens' && outputTokenParameter !== 'max_completion_tokens') throw new Error('출력 토큰 API 옵션이 올바르지 않습니다.');
 	if (structuredOutput !== 'json_schema' && structuredOutput !== 'json_object') throw new Error('구조화된 출력 API 옵션이 올바르지 않습니다.');
 	const apiKey = text(row.apiKey ?? '', 'API 키', 4000, true);
 	if (/[\r\n]/.test(apiKey)) throw new Error('API 키에는 줄바꿈을 넣을 수 없습니다.');
-	return { id: identifier(row.id, 'Provider ID'), label: text(row.label, 'Provider 이름', 100), kind, baseUrl: url.toString().replace(/\/+$/, ''), apiKeyEnv, apiKey, models, outputTokenParameter, structuredOutput };
+	return { id: identifier(row.id, 'Provider ID'), label: text(row.label, 'Provider 이름', 100), kind, decisionApi: decisionApi as PublicProvider['decisionApi'], decisionMaxChoices: Number(decisionMaxChoices), baseUrl: url.toString().replace(/\/+$/, ''), apiKeyEnv, apiKey, models, outputTokenParameter, structuredOutput };
 }
 
 export function providerRegistry(defaults: Defaults): Registry {
@@ -110,7 +119,7 @@ export const aliasReference = (providerId: string, aliasId: string) => `${provid
 function routeFor(owner: Provider, model: string): ProviderRoute {
 	const apiKey = owner.apiKeyEnv ? process.env[owner.apiKeyEnv] : owner.apiKey;
 	if (owner.apiKeyEnv && !apiKey) throw new Error(`${owner.label}: API 키 환경 변수가 설정되지 않았습니다.`);
-	return { providerId: owner.id, providerLabel: owner.label, kind: owner.kind, baseUrl: owner.baseUrl, model, apiKey: apiKey ?? '', outputTokenParameter: owner.outputTokenParameter, structuredOutput: owner.structuredOutput };
+	return { providerId: owner.id, providerLabel: owner.label, kind: owner.kind, decisionApi: owner.decisionApi, decisionMaxChoices: owner.decisionMaxChoices, baseUrl: owner.baseUrl, model, apiKey: apiKey ?? '', outputTokenParameter: owner.outputTokenParameter, structuredOutput: owner.structuredOutput };
 }
 export function providerCatalogRoute(defaults: Defaults, id: string): ProviderRoute {
 	const owner = providerRegistry(defaults).providers.find((entry) => entry.id === id);
@@ -123,8 +132,8 @@ export function resolveProviderModel(defaults: Defaults, reference: string, task
 	if (!owner || parts.length > 2) throw new Error('선택한 Provider가 없습니다. 모델 설정에서 다시 선택해 주세요.');
 	const alias = parts.length === 2 ? owner.models.find((entry) => entry.id === parts[1]) : undefined;
 	if (parts.length === 2 && !alias) throw new Error('선택한 모델 별칭이 없습니다. 모델 설정에서 다시 선택해 주세요.');
-	if (alias && alias.task !== (task === 'embedding' ? 'embedding' : 'generation')) throw new Error('모델 별칭의 용도가 요청과 다릅니다.');
-	if (task === 'decision' && owner.kind !== 'oev') throw new Error('판단 모델에는 /systemone을 지원하는 OEV Provider가 필요합니다.');
+	if (alias && (task === 'decision' ? !['decision', 'generation'].includes(alias.task) : alias.task !== task)) throw new Error('모델 별칭의 용도가 요청과 다릅니다.');
+	if (task === 'decision' && decisionApiFor(owner) === 'none') throw new Error('판단 모델에는 System One 또는 Decision API를 설정한 Provider가 필요합니다. 기존 OEV 설정은 System One을 사용합니다.');
 	return routeFor(owner, alias?.modelId ?? reference);
 }
 export function resolveProviderSnapshot(defaults: Defaults, selection: ModelSelection): ProviderSnapshot {
@@ -137,9 +146,9 @@ export function checkedProviderSnapshot(input: unknown): ProviderSnapshot {
 	const route = (input: unknown): ProviderRoute => {
 		const value = record(input, 'Provider 호출 대상');
 		const checked = provider({ ...value, id: value.providerId, label: value.providerLabel, models: [] });
-		return { providerId: checked.id, providerLabel: checked.label, kind: checked.kind, baseUrl: checked.baseUrl, apiKey: checked.apiKey, model: text(value.model, '실제 모델 ID', 200), outputTokenParameter: checked.outputTokenParameter, structuredOutput: checked.structuredOutput };
+		return { providerId: checked.id, providerLabel: checked.label, kind: checked.kind, decisionApi: checked.decisionApi, decisionMaxChoices: checked.decisionMaxChoices, baseUrl: checked.baseUrl, apiKey: checked.apiKey, model: text(value.model, '실제 모델 ID', 200), outputTokenParameter: checked.outputTokenParameter, structuredOutput: checked.structuredOutput };
 	};
 	const result = { decision: route(row.decision), text: route(row.text) };
-	if (result.decision.kind !== 'oev') throw new Error('작업의 판단 Provider는 OEV여야 합니다.');
+	if (decisionApiFor(result.decision) === 'none') throw new Error('작업의 판단 Provider에는 System One 또는 Decision API가 필요합니다.');
 	return result;
 }

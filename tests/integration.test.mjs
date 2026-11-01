@@ -87,6 +87,112 @@ async function waitJob(base, db, worldId, failure = false) {
 	assert.fail('job did not finish');
 }
 
+test('explicit model refresh discovers and persists additional provider models for the selection lists', async () => {
+	const model = createServer((request, response) => {
+		response.setHeader('content-type', 'application/json');
+		response.end(JSON.stringify({ data: [{ id: 'geniex-model' }, { id: 'translation-model' }] }));
+	});
+	const port = await listen(model), directory = scratch();
+	const running = await app(directory, `http://127.0.0.1:${port}/v1`);
+	try {
+		let registry = await (await fetch(`${running.base}/api/providers`)).json();
+		const response = await fetch(`${running.base}/api/providers`, { method: 'POST', headers: { origin: running.base, 'content-type': 'application/json' }, body: JSON.stringify({ revision: registry.revision, provider: { id: 'geniex', label: 'Geniex', kind: 'openai-compatible', decisionApi: 'decision', baseUrl: `http://127.0.0.1:${port}/v1`, models: [] } }) });
+		assert.equal(response.status, 200);
+		const before = await (await fetch(`${running.base}/api/models`)).json();
+		assert.equal(before.options.length, 0, 'opening the settings does not import aliases');
+		assert.equal((await fetch(`${running.base}/api/models`, { method: 'POST', headers: { origin: 'https://elsewhere.test' } })).status, 403);
+		const refreshed = await fetch(`${running.base}/api/models`, { method: 'POST', headers: { origin: running.base } });
+		assert.equal(refreshed.status, 200);
+		const catalog = await refreshed.json();
+		assert.deepEqual(catalog.options.map(option => option.modelId), ['geniex-model', 'translation-model']);
+		assert.ok(catalog.options.every(option => option.decision && option.generation));
+		registry = await (await fetch(`${running.base}/api/providers`)).json();
+		assert.equal(registry.providers.find(provider => provider.id === 'geniex').models.length, 2);
+		const html = await (await fetch(running.base)).text();
+		const worldId = /name="worldId" value="([^"]+)"/.exec(html)?.[1];
+		assert.ok(worldId);
+		await post(running.base, 'models', { worldId, decisionModel: catalog.options[0].value, textModel: catalog.options[1].value });
+		await running.stop();
+		const restarted = await app(directory, `http://127.0.0.1:${port}/v1`);
+		try {
+			const persisted = await (await fetch(`${restarted.base}/api/models`)).json();
+			assert.deepEqual(persisted.options.map(option => option.value), catalog.options.map(option => option.value));
+		} finally { await restarted.stop(); }
+	} finally { await running.stop(); model.close(); }
+});
+
+test('Decision API selections and pinned protocols survive provider edits and restart alongside System One', async () => {
+	const calls = [];
+	let held = false, release;
+	const gate = new Promise(done => { release = done; });
+	const model = createServer(async (request, response) => {
+		response.setHeader('content-type', 'application/json');
+		if (request.url === '/v1/models') { response.end(JSON.stringify({ data: [{ id: 'actor-model', task: 'generation' }] })); return; }
+		const chunks = []; for await (const chunk of request) chunks.push(chunk);
+		const body = JSON.parse(Buffer.concat(chunks).toString());
+		calls.push({ path: request.url, body, auth: request.headers.authorization });
+		if (request.url === '/v1/decisions') {
+			assert.ok(Array.isArray(body.questions));
+			const state = JSON.parse(body.input), question = body.questions[0];
+			const choice = question.name === 'identity_check' ? 'consistent' : question.name === 'performance_check' ? 'accept' : question.name === 'inactivity' ? 'idle' : participation(state);
+			response.end(JSON.stringify({ model: body.model, answers: [{ name: question.name, type: 'choice', choice }], usage: { input_tokens: 50, output_tokens: 0, total_tokens: 50 } })); return;
+		}
+		if (request.url === '/v1/systemone') {
+			if (replyPerformanceReview(body, response)) return;
+			response.end(participationResponse(participation(body.state), 'idle')); return;
+		}
+		if (replyReflection(body, response)) return;
+		if (!held) { held = true; await gate; }
+		response.end(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({ actionId: 'speak:player', targetId: 'player', parts: [{ kind: 'act', text: '고개를 끄덕인다.' }, { kind: 'speak', text: `준비됐어요. ${JSON.parse(body.messages[1].content).time.tick}` }], memoUpdate: null }) } }] }));
+	});
+	const port = await listen(model), baseUrl = `http://127.0.0.1:${port}/v1`, directory = scratch();
+	let running = await app(directory, baseUrl);
+	const db = new DatabaseSync(join(directory, 'newera.sqlite'));
+	try {
+		const row = db.prepare('SELECT id,state_json FROM theater_worlds LIMIT 1').get(), state = JSON.parse(row.state_json);
+		state.instances.find(actor => actor.id === 'harin').active = false;
+		db.prepare('UPDATE theater_worlds SET state_json=? WHERE id=?').run(JSON.stringify(state), row.id);
+		const snapshot = () => { const saved = db.prepare('SELECT revision,state_json FROM theater_worlds WHERE id=?').get(row.id); return { revision: String(saved.revision), state: JSON.parse(saved.state_json) }; };
+		let registry = await (await fetch(`${running.base}/api/providers`)).json();
+		let provider = { id: 'judge', label: 'Luna / Geniex', kind: 'openai-compatible', decisionApi: 'decision', baseUrl, apiKey: 'decision-secret', models: [{ id: 'choice', label: '판단 전용', modelId: 'gpt-6-luna', task: 'decision' }] };
+		async function saveProvider() {
+			const response = await fetch(`${running.base}/api/providers`, { method: 'POST', headers: { origin: running.base, 'content-type': 'application/json' }, body: JSON.stringify({ revision: registry.revision, provider }) });
+			registry = await response.json(); assert.equal(response.status, 200, JSON.stringify(registry));
+		}
+		await saveProvider();
+		const selection = { worldId: row.id, decisionModel: 'judge::choice', textModel: 'actor-model' };
+		await post(running.base, 'models', { ...selection, textModel: 'judge::choice' }, '/', true);
+		await post(running.base, 'models', selection);
+		await post(running.base, 'turn', { worldId: row.id, revision: snapshot().revision, kind: 'speak', text: '시작할까요?' });
+		for (let index = 0; index < 300 && !held; index++) await pause(20);
+		assert.ok(held);
+		const active = await latestJob(running.base, db, row.id);
+		const pinned = JSON.parse(db.prepare('SELECT providers_json FROM theater_jobs WHERE id=?').get(active.id).providers_json);
+		assert.equal(pinned.decision.decisionApi, 'decision');
+		provider = { ...provider, decisionApi: 'systemone', apiKey: 'new-secret' };
+		await saveProvider();
+		await running.stop();
+		db.prepare("UPDATE theater_jobs SET heartbeat_at='2000-01-01T00:00:00.000Z' WHERE id=?").run(active.id);
+		running = await app(directory, baseUrl);
+		release();
+		await waitJob(running.base, db, row.id);
+		const finished = snapshot().state, performed = finished.events.find(event => event.actorId === 'seoyeon');
+		assert.equal(performed.decision.decisionApi, 'decision');
+		assert.equal(finished.events.filter(event => event.actorId === 'player').length, 1);
+		assert.ok(!calls.some(call => call.path === '/v1/systemone'), 'restart keeps the accepted Decision API instead of the edited System One setting');
+		assert.ok(calls.filter(call => call.path === '/v1/decisions').every(call => call.auth === 'Bearer decision-secret'));
+		const exportedWorld = (await exported(running.base, row.id)).world;
+		assert.equal(exportedWorld.state.events.find(event => event.actorId === 'seoyeon').decision.decisionApi, 'decision');
+		assert.ok(!JSON.stringify(exportedWorld).includes('decision-secret'));
+		const boundary = calls.length;
+		await post(running.base, 'turn', { worldId: row.id, revision: snapshot().revision, kind: 'wait' });
+		await waitJob(running.base, db, row.id);
+		assert.ok(calls.slice(boundary).some(call => call.path === '/v1/systemone' && call.auth === 'Bearer new-secret'), 'a new job adopts the edited protocol');
+		const latest = snapshot().state;
+		assert.equal(latest.events.filter(event => event.actorId === 'seoyeon').at(-1).decision.decisionApi, 'systemone');
+	} finally { release(); await running.stop(); db.close(); model.closeAllConnections(); await new Promise(done => model.close(done)); }
+});
+
 test('transcript combines consecutive actions and speech across turns while retaining speakers, recipients and scene boundaries', async () => {
 	const directory = scratch();
 	const running = await app(directory, 'http://127.0.0.1:9/v1');
@@ -1299,7 +1405,7 @@ test('appearance choices survive later inference failure, restart and slots; edi
 		const partial = snapshot();
 		assert.equal(outfitCalls, 2);
 		const harin = partial.state.instances.find(i => i.id === 'harin');
-		assert.deepEqual(harin.appearanceSelection, { day: 1, minute: 1081, sceneId: 'lobby', outfitId: 'uniform', model: 'actor-model' });
+		assert.deepEqual(harin.appearanceSelection, { day: 1, minute: 1081, sceneId: 'lobby', outfitId: 'uniform', model: 'actor-model', decisionApi: 'systemone' });
 		assert.equal(partial.state.events.length, 1);
 		assert.equal(partial.state.minute, initial.state.minute + 1);
 		await running.stop();

@@ -22,6 +22,7 @@ export interface InferenceDiagnostic {
 	providerId?: string;
 	providerLabel?: string;
 	model?: string;
+	decisionApi?: 'systemone' | 'decision';
 	finishReason?: string | null;
 	outputTokenLimit?: number;
 	contentChars?: number;

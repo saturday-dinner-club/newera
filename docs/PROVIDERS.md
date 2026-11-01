@@ -1,6 +1,6 @@
 # Provider와 모델 별칭
 
-화면 상단 **모델 설정 → Provider 관리**에서 OEV 서버와 OpenAI 호환 API를 여러 개 등록합니다. Provider 등록은 앱 전체에서 공유하며, 판단·생성 모델 선택은 세계관별로 저장합니다.
+화면 상단 **메뉴 → 모델과 삽화 설정 → Provider 관리**에서 OEV 서버와 OpenAI 호환 API를 여러 개 등록합니다. Provider 등록은 앱 전체에서 공유하며, 판단·생성 모델 선택은 세계관별로 저장합니다.
 
 ## 화면에서 설정하기
 
@@ -8,7 +8,9 @@
 2. **서버 모델 목록 가져오기**로 모델을 가져오거나 **모델 별칭 추가**로 직접 등록합니다. 실제 모델 ID와 표시 별칭을 입력하고 저장합니다. 조회한 모델은 저장 전까지 편집 초안입니다.
 3. 위쪽 판단·생성 선택창에서 `Provider 이름 / 모델 별칭`을 선택하고 **모델 적용**을 누릅니다. 같은 모델 ID도 서버별로 구분됩니다.
 
-판단은 `/systemone`을 제공하는 **OEV**만 선택할 수 있습니다. 생성에는 OEV와 **OpenAI 호환 API**를 모두 사용할 수 있습니다. 관찰·관계 해석도 선택한 생성 Provider를 사용합니다. 정체성·표현 검수와 옷차림 선택은 판단 Provider의 typed decision을 사용합니다. 임베딩용 별칭은 판단·생성 목록에서 제외합니다.
+상단 **목록 새로고침**은 기본 OEV와 추가로 등록된 Provider 서버를 조회합니다. 새 모델은 별칭으로 저장해 선택창에 표시하며, 기존 별칭의 이름·용도와 세션의 모델 선택은 유지합니다. 일부 서버 조회에 실패하면 해당 오류와 기존 별칭을 함께 표시합니다. 조회 도중 Provider 설정이 바뀌면 해당 결과를 저장하지 않고 다시 조회하도록 안내합니다. 설정 창을 여는 것만으로는 별칭을 추가하지 않습니다.
+
+판단은 **System One** 또는 **Decision API**를 설정한 Provider에서 선택합니다. 생성에는 OEV와 **OpenAI 호환 API**를 모두 사용할 수 있습니다. `task: "decision"` 별칭은 판단 전용이며 문장 생성 목록에서는 제외됩니다. 관찰·관계 해석도 선택한 생성 Provider를 사용합니다. 정체성·표현 검수와 옷차림 선택은 판단 Provider의 typed decision을 사용합니다. 임베딩용 별칭은 판단·생성 목록에서 제외합니다.
 
 기존 기본 OEV 자동 모델 목록과 별칭 없는 모델 ID도 계속 사용할 수 있습니다. 기본 OEV는 삭제하거나 OpenAI 호환 유형으로 바꿀 수 없습니다. 세션에서 선택 중인 Provider나 별칭을 제거하려면 해당 세션의 모델을 먼저 변경합니다. 선택 중인 별칭의 표시 이름이나 실제 모델 ID는 수정할 수 있습니다.
 
@@ -79,6 +81,52 @@ OpenAI 호환 생성 요청에는 OEV 전용 `input_type`, `reasoning_effort`, `
 
 설정 파일은 새 작업이나 수동 재시도의 호출 대상 결정 시 다시 읽고 유효한 전체 설정으로 교체합니다. 잘못된 파일은 마지막 유효 설정을 유지하며, 처음부터 잘못되었으면 오류로 표시합니다. GUI 저장은 리비전을 검사하고 다른 창에서 먼저 저장했다면 목록을 다시 불러오도록 안내합니다. 파일을 직접 수정할 때도 `revision`을 증가시킵니다. 설정 파일 경로와 서버 환경 변수의 변경은 서버 재시작이 필요합니다.
 
+
+## System One과 Decision API
+
+생성·임베딩의 `kind`와 판단의 `decisionApi`를 독립적으로 저장합니다.
+
+| 설정 | 요청 경로 | 입력과 질문 | 응답 |
+| --- | --- | --- | --- |
+| `decisionApi: "systemone"` | `/systemone` | `state`, 이름별 `questions` 객체와 `criteria` | 이름별 `answers` 객체 |
+| `decisionApi: "decision"` | `/decisions` | JSON 근거를 담은 문자열 `input`, 이름이 있는 `questions` 배열과 `choices` | 이름이 있는 `answers` 배열 |
+| `decisionApi: "none"` | 판단 사용 안 함 | 생성·임베딩 용도만 사용 | — |
+
+기존 설정과 작업 스냅샷에 필드가 없으면 OEV는 `systemone`, OpenAI 호환 Provider는 `none`으로 읽습니다. 진행 중 작업은 접수한 API 유형·경로·후보 한도·모델·인증 정보를 고정하며, 설정 변경은 새 작업과 수동 재시도부터 적용됩니다. HTTP 로그와 오류 진단에 `decisionApi`를 기록합니다. 새 행동·비참여·옷차림 기록에도 API 유형을 남기며 저장 슬롯·재시작·세계관 내보내기에서 보존합니다. 예전 기록의 누락된 유형은 화면에서 System One으로 표시합니다.
+
+현재 공연에서는 행동 여부, 비참여 태도, 옷차림, 정체성·표현 검수, 삽화 여부의 **choice** 질문을 변환합니다. predicate·score를 사용하는 새 게임 기능은 이 구현에 포함되지 않습니다. 응답을 배열 위치가 아닌 질문 이름으로 연결하고, 중복·누락·알 수 없는 이름·타입·후보를 거부합니다. 거절 응답은 재시도하거나 다른 API로 바꾸지 않고 해당 판단을 실패로 알립니다. 후보가 하나뿐인 옷차림은 호스트에서 그 후보를 선택하며 요청을 보내지 않습니다.
+
+### OpenAI Luna
+
+Provider 관리에서 **OpenAI Luna 추가 → Provider 저장**을 누릅니다. 기본 주소는 `https://api.openai.com/v1`, API는 `decision`, 경로는 `/decisions`, 키 환경 변수는 `OPENAI_API_KEY`, 모델은 `gpt-6-luna`, 별칭 용도는 `decision`입니다. 문장 생성 모델은 별도로 선택합니다. 키 값은 화면 응답과 로그에 포함하지 않습니다.
+
+### Geniex
+
+**Geniex 추가 → Provider 저장 → 서버 모델 목록 가져오기 → Provider 저장** 순서로 등록합니다. 기본 주소는 `http://127.0.0.1:18181/v1`, API는 `decision`, 경로는 `/decisions`입니다. 조회한 모델은 판단·문장 생성용으로 등록되며 판단 전용으로 바꿀 수 있습니다. 인증이 필요하면 해당 서버의 키 또는 키 환경 변수를 지정합니다.
+
+[Geniex Swagger 명세](http://127.0.0.1:18181/docs/swagger.yaml)와 현재 서버가 제공하는 경로는 복수형 `/v1/decisions`입니다. 오류가 나도 경로나 API 유형을 자동 추측해 재전송하지 않습니다.
+
+`decisionMaxChoices`는 한 질문의 후보 수 한도입니다. 기본값과 Luna 프리셋은 255, Geniex 프리셋은 명세에 맞춰 26입니다. 후보를 임의로 자르지 않고 한도를 초과하면 오류로 알립니다. 새 설정은 API 세부 옵션에서 수정할 수 있습니다.
+
+```json
+{
+  "id": "openai-luna",
+  "label": "OpenAI Luna",
+  "kind": "openai-compatible",
+  "decisionApi": "decision",
+  "decisionMaxChoices": 255,
+  "baseUrl": "https://api.openai.com/v1",
+  "apiKeyEnv": "OPENAI_API_KEY",
+  "models": [
+    { "id": "luna", "label": "Luna", "modelId": "gpt-6-luna", "task": "decision" }
+  ]
+}
+```
+
+이를 `providers` 배열에 추가하면 판단 모델 선택 값은 `openai-luna::luna`입니다. 기존 기본 OEV와 함께 사용할 수 있습니다. 제공자의 상세 계약은 [OpenAI Decisions API](https://developers.openai.com/api/reference/resources/decisions/methods/create)를 참고하세요.
+
+2026-11-02에 합성한 옷차림 후보 2개로 새 어댑터를 통해 OpenAI Luna와 로컬 Geniex를 각각 실제 호출했습니다. 두 서비스 모두 HTTP 200과 허용된 후보를 반환했고 `decisionApi: "decision"` 및 입력 토큰 사용량을 확인했습니다. 실제 사용자 대화는 이 검증에 보내지 않았습니다. 이 결과는 해당 요청의 연결 검증이며 모든 게임 장면의 판단 품질을 보장하지 않습니다.
+
 ## 파일 형식
 
 GUI가 안정적인 ID를 생성합니다. 선택 값은 `Provider ID::별칭 ID`이고 표시 이름은 자유롭게 바꿀 수 있습니다. 아래 예시의 `writer::story`를 생성 모델로 사용할 수 있습니다.
@@ -117,4 +165,4 @@ Provider는 최대 32개, 각 Provider의 별칭은 최대 100개입니다. 별�
 
 임베딩 Provider는 `task: "embedding"` 별칭을 등록하고 `models.json`의 `embeddingModel` 또는 `NEWERA_EMBEDDING_MODEL`에 `Provider ID::별칭 ID`를 지정합니다. 기본 `embeddinggemma2`는 기존 기본 OEV를 사용합니다. 임베딩 모델과 차원은 별도 설정을 유지하며, 실제 API 주소·유형·모델이 달라지면 다른 LanceDB 테이블을 사용합니다. 각 검색은 테이블 구분과 실제 임베딩 요청에 같은 Provider 스냅샷을 사용하며 다음 검색부터 별칭 변경을 반영합니다. 모델 선택 GUI는 판단·생성용이며 임베딩 선택은 파일·환경 변수로 설정합니다.
 
-로컬 HTTP 서버 두 개를 사용해 Provider별 실제 요청·인증, 구조화 출력 옵션, 수정·삭제 후 재시도와 서버 재시작을 검증합니다. 외부 유료 API에 대한 실호출 검증은 포함하지 않습니다.
+로컬 HTTP 서버 두 개를 사용해 Provider별 실제 요청·인증, 구조화 출력 옵션, 수정·삭제 후 재시도와 서버 재시작을 검증합니다. 자동 테스트는 로컬 모의 서버를 사용하며, 별도의 Luna·Geniex 실호출 결과는 위 절에 기록합니다.

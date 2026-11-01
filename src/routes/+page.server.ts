@@ -57,7 +57,7 @@ export const actions: Actions = {
 			}
 			const selection = checkedModelSelection({ decisionModel: body.get('decisionModel'), textModel: body.get('textModel') });
 			const catalog = await getModelCatalog(request.signal);
-			if (!catalog.models.includes(selection.decisionModel) || !catalog.models.includes(selection.textModel)) throw new Error('등록된 Provider에서 사용할 수 있는 모델을 선택해 주세요.');
+			if (!catalog.options.some(option => option.value === selection.decisionModel && option.decision) || !catalog.options.some(option => option.value === selection.textModel && option.generation)) throw new Error('등록된 Provider에서 각 용도에 사용할 수 있는 모델을 선택해 주세요.');
 			resolveProviderSnapshot(modelSettings(), selection);
 			setWorldModels(worldId, selection);
 			return { message: '이 세션의 모델 설정을 저장했습니다. 다음 이야기부터 적용됩니다.', models: selection };

@@ -150,7 +150,7 @@ test('retrying an inactivity failure does not infer successful participation aga
 			return success(url, init);
 		};
 		const result = await (await createDirector(new AbortController().signal)).decide(state);
-		assert.deepEqual(result, { act: false, inactivity: 'continue', model: 'gemma4-26b' });
+		assert.deepEqual(result, { act: false, inactivity: 'continue', model: 'gemma4-26b', decisionApi: 'systemone' });
 		assert.equal(calls.filter(call => call.body?.questions?.participation).length, 1);
 		assert.equal(inactivityAttempts, 2);
 		assert.equal(calls.filter(call => call.url.endsWith('/chat/completions')).length, 0);
@@ -162,7 +162,7 @@ test('outfit selection uses the session decision model and exact authored finite
 	const calls = provider({ choice: 'uniform' });
 	try {
 		const director = await createDirector(new AbortController().signal, { decisionModel: 'actor-model', textModel: 'gemma4-26b' });
-		assert.deepEqual(await director.chooseAppearance(state, outfits), { outfitId: 'uniform', model: 'actor-model' });
+		assert.deepEqual(await director.chooseAppearance(state, outfits), { outfitId: 'uniform', model: 'actor-model', decisionApi: 'systemone' });
 		assert.equal(calls[1].body.model, 'actor-model');
 		assert.deepEqual(Object.keys(calls[1].body.questions), ['outfit']);
 		assert.deepEqual(calls[1].body.questions.outfit.criteria, Object.fromEntries(outfits.map(({ id, ...rest }) => [id, rest])));
@@ -177,7 +177,7 @@ test('binary participation precedes structured action inference with Gemma4 26B'
 	const calls = provider();
 	try {
 		const director = await createDirector(new AbortController().signal);
-		assert.deepEqual(await director.decide(state), { act: true, model: 'gemma4-26b' });
+		assert.deepEqual(await director.decide(state), { act: true, model: 'gemma4-26b', decisionApi: 'systemone' });
 		assert.match((await director.perform(state, actions)).utterance, /반가워요/);
 		assert.deepEqual(Object.keys(calls[1].body.questions), ['participation']);
 		assert.deepEqual(Object.keys(calls[1].body.questions.participation.criteria), ['act', 'wait']);
@@ -366,7 +366,7 @@ test('only non-participation requests the separate watch, continue or idle decis
 		for (const inactivity of ['watch', 'continue', 'idle']) {
 			const calls = provider({ choice: 'wait', inactivity });
 			const director = await createDirector(new AbortController().signal);
-			assert.deepEqual(await director.decide(state), { act: false, inactivity, model: 'gemma4-26b' });
+			assert.deepEqual(await director.decide(state), { act: false, inactivity, model: 'gemma4-26b', decisionApi: 'systemone' });
 			assert.equal(calls.length, 3, 'one lookup, participation, then inactivity only when waiting');
 			assert.deepEqual(Object.keys(calls[1].body.questions.participation.criteria), ['act', 'wait']);
 			assert.deepEqual(Object.keys(calls[2].body.questions), ['inactivity']);
