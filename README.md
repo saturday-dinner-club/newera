@@ -1,10 +1,19 @@
 # newera · Theater
 
-씬 안의 인물과 오브젝트가 사건을 관찰하고 각자의 다음 행동을 선택하는 텍스트 게임입니다. 세계관 아래에 씬과 원형을 정의하고, 실제 무대에는 독립적인 상태와 기억을 가진 인스턴스를 배치합니다. 동행 캐릭터는 플레이어와 씬을 이동하면서 같은 정체성과 기억을 유지합니다.
+newera is a scene-based text roleplaying game where characters observe events, form their own impressions, and choose what to do next. Worlds define scenes, character and object templates, and instances with independent state and memory. Companions travel with the player while retaining their identity, relationships, and history.
 
-## 실행
+Built with Svelte 5, SvelteKit, TypeScript, and SQLite. The interface, built-in prompts, and bundled worlds are primarily in Korean.
 
-Node.js 24.10 이상과 OEV 서버가 필요합니다.
+## Getting started
+
+You need **Node.js 24.10 or later** and model servers for two roles:
+
+- **Decisions:** an OEV System One server or a compatible Decisions API.
+- **Generation:** a Chat Completions server that can produce valid structured JSON for actions, dialogue, and character reflection.
+
+The same server can fill both roles if it supports both contracts. Images and embedding-based memory retrieval are optional. Scenes without resident characters can run without a model connection.
+
+From the repository root, run:
 
 ```powershell
 Copy-Item .env.example .env
@@ -12,167 +21,154 @@ npm install
 npm run dev
 ```
 
-`http://localhost:5173`에서 플레이하고 `/lores`에서 세계관·씬·원형·인스턴스를 편집합니다. 처음 실행하면 **비가 그친 뒤의 극장**이 열립니다. 새 예제는 `static/lore-presets/theater-opening.json`을 가져와 열 수 있습니다.
+On macOS or Linux, use `cp .env.example .env` for the first command. Open [localhost:5173](http://localhost:5173) to play, `/lores` to edit worlds, and `/images` to manage illustration presets.
 
-규모 있는 학원물 예제 **솔빛고, 가을제까지 열흘**은 [가져오기 파일](static/lore-presets/solbit-high.json)을 작업실에서 가져와 사용합니다. 현대 한국 고등학교를 배경으로 44개 씬, 학생·교직원·이웃 25명, 오브젝트 49개를 포함하며 일상·동아리·축제와 가벼운 미스터리를 다룹니다. [세계관·인물·단서 설정](docs/SOLBIT_HIGH.md)과 [작성 원본](lore-sources/solbit-high.json)을 함께 제공합니다.
+The bundled environment example points to `http://macstudio:12821/v1`. Replace it with your OEV server address, or register other providers through the interface as described below. That hostname is not a service supplied by this repository.
 
-성인 캠퍼스 연애물 **하온대학교, 스물하나의 첫 학기**는 [가져오기 파일](static/lore-presets/haon-university.json)로 시작합니다. 입학 직후 군휴학한 남자 주인공이 만 21세에 복학해 만 19세 신입생 네 명과 첫 교양 과제의 같은 조가 됩니다. 씬 29개·인물 10명·사물 38개에 첫 관계, 의상·음식 취향과 각자의 생활·연애관을 설정했습니다. [세계관·인물 설정](docs/HAON_UNIVERSITY.md)과 [작성 원본](lore-sources/haon-university.json)을 함께 제공합니다.
+For a production build:
 
 ```powershell
 npm run build
 npm start
 ```
 
-개발 서버는 시작할 때 `.env`의 `NEWERA_` 설정을 읽습니다. 배포 실행은 `npm start`가 `.env`를 읽습니다. 직접 실행할 때는 `node --env-file-if-exists=.env build/index.js`를 사용합니다.
+`npm start` loads `.env` through Node's `--env-file-if-exists` option. The development server also loads the supported server-side environment variables from `.env` at startup. Restart the server after changing environment variables.
 
-## 플레이와 편집
+## Connecting models
 
-**화면** 메뉴에서 시스템·다크·라이트 테마와 이야기 글자 크기(16·18·20px)를 선택합니다. 선택은 이 브라우저에 저장되며 공연·작업실·삽화 화면에 공통 적용됩니다.
+Open **Menu → Model and illustration settings → Provider management** (`메뉴 → 모델과 삽화 설정 → Provider 관리`). Register API base URLs including their `/v1` prefix, credentials when required, and model aliases. Then choose a decision model and a text model for the current world and apply them.
 
-작업실의 탭·검색·현재/시작 시점·관계 상대 전환은 작성한 내용을 유지합니다. 한 항목을 저장해도 다른 항목의 미저장 편집은 남습니다. 미저장 개수를 표시하며 작업실을 떠나거나 새로고침할 때 확인합니다. 초안은 자동 저장하지 않으므로 떠나기 전에 각 항목을 저장해 주세요. 삽화 프리셋도 미저장 변경을 표시하고 다른 프리셋으로 전환하거나 페이지를 떠날 때 확인합니다.
-
-공연의 **잠시 멈추기**는 확정된 이야기와 대기 입력을 보존하고, **이어서 진행**으로 재개합니다. 문제로 멈춘 경우와 화면에서 구별합니다.
-
-- **행동과 대사 보내기**: `*고개를 끄덕인다* "좋아요."`처럼 행동은 별표, 대사는 큰따옴표로 감쌉니다. 한 번에 섞어 보내거나 행동만 보낼 수 있으며 입력 순서대로 지문과 발언을 구분해 기록·전달합니다. 표기 없이 쓴 문장은 대사로 처리합니다. 현재 씬의 한 인물 또는 현장 모두를 대상으로 하며 다른 씬의 인물에게는 전달되지 않습니다.
-- **상호작용**: 씬에 있는 오브젝트의 현재 조건에 맞는 행동을 선택합니다. 선언된 효과가 상태를 바꾸고, 사건 반응 컴포넌트가 이어서 작동합니다.
-- **이동**: 씬에 연결된 출구로 이동합니다. 동행은 같은 인스턴스로 따라오고, 현지 인물은 남습니다.
-- **잠시 지켜본다**: 시간을 5분 진행하고 현장 인물들의 선택을 받습니다. 그 밖의 행동은 1분 진행합니다.
-
-인물이 내 답변을 기다리는 중에도 **잠시 지켜본다**를 선택할 수 있습니다. 대사 없이 게임 속 시간을 5분 보내고 이야기를 이어갑니다. **지금 이어가기**는 게임 속 시간을 더 보내지 않고 답변 대기만 건너뜁니다.
-
-현장 인물은 기본 반응 속도·말수 성향·현재 흥분도에 따라 행동 판단 기회를 얻습니다. 같은 시간 구간에서 최종 속도가 20인 인물은 5인 인물보다 네 배 자주 판단할 수 있고, 기회를 얻어도 말할지 기다릴지는 각자 결정합니다. 지정 상대는 같은 시점에 준비된 인물 사이에서 우선합니다. 새 사건을 목격해도 쌓인 진행도는 유지하며, 행동한 본인도 현재 씬에 남으면 다시 참여할 수 있습니다. 기다림은 자신이나 다른 인물을 깨우지 않으며 활성 후보가 없으면 새 입력을 기다립니다. 무대 밖 인물은 따로 시뮬레이션하지 않습니다.
-
-**작업실 → 캐릭터·사물**에서 기본 반응 속도(1~100, 기본 10)와 말수 성향(0~100, 기본 50)을, **배치·관계**에서 현재/시작 시 흥분도(0~100, 기본 0)를 편집합니다. 흥분도는 새 사건을 해석하면서 갱신됩니다. 진행도와 흥분도는 저장·복원하고, 생성 실패·중단 후에는 예약한 기회에서 재시도합니다. 계산식과 호환 규칙은 [반응 속도 설계](docs/REACTION_SPEED_DESIGN.md)를 참고하세요. 동봉한 극장·솔빛고·하온대 38명의 [초기 수치표](docs/LORE_REACTION_PROFILES.md)도 제공합니다.
-
-생성 결과가 같은 인물의 직전 실제 행동과 완전히 같으면 **아무것도 하지 않는다(`idle`)**로 처리합니다. 같은 씬·행동 종류·대상과 행동 묘사·대사가 일치해야 하며, 상호작용 ID와 이동 목적지도 구분합니다. 메모·모델·시각만 달라진 결과는 새 행동으로 보지 않습니다. 중복 결과는 추가 모델 검수·재생성을 생략하고 사건·목격 기억·상태 효과·제안 메모를 저장하지 않으며 자신이나 다른 인물을 깨우지 않습니다. 비교는 저장된 전체 사건에서 직전 실제 행동을 찾으므로 재시작·새 입력·모델 변경 후에도 적용됩니다. 기다림은 비교 기준을 바꾸지 않습니다. 표현이나 대상이 달라진 새 반응은 기존 판단·검수를 따릅니다.
-
-공연 상태 줄의 **잠시 멈추기** 버튼은 운영 조작으로 현재 작업을 즉시 중단하고 늦게 도착한 응답의 저장을 막습니다. 입력창 초안과 이미 확정된 기록은 유지하며 **이어서 진행**으로 재개할 수 있습니다. 아래의 극중 «그만» 발언과는 별개의 조작입니다.
-
-생성 중에도 채팅으로 개입할 수 있습니다. 입력은 먼저 저장하고 다음 행동을 확정하기 전에 반영합니다. 이전 관찰로 생성하던 미확정 응답은 버리고 새 입력을 보고 다시 판단합니다. «그만»도 장면 안의 발언이므로 인물이 기다리거나 계속 말할지는 각자 결정합니다.
-
-인물이 **나에게** 말을 하면 실제 시간 기준 **최대 5분** 동안 다음 인물의 판단·생성을 멈추고 플레이어의 답변을 기다립니다. 아래 입력창에서 행동이나 대사를 전송하면 즉시 반영하고 진행하며, 입력 없이 시간이 지나면 자동으로 이어집니다. 작성 중인 초안은 전송 전까지 입력으로 취급하지 않습니다. 입력창 위에 `분:초` 타이머와 **지금 이어가기**를 표시합니다. 이 버튼은 현재 답변 대기만 건너뛰며 게임 속 시간을 추가하거나 플레이어 발언을 만들지 않습니다. 대기 중 보낸 입력을 먼저 반영하며, 지난 질문의 버튼으로 새 질문을 건너뛸 수 없습니다. 대기 기한을 저장하므로 새로고침·서버 재시작·재시도 시 같은 기한을 사용합니다. 이 대기는 게임 속 시간을 추가로 진행하지 않습니다. 다른 인물에게 한 발언과 완전 중복으로 생략된 발언은 대기를 만들지 않습니다.
-
-큰따옴표는 `"대사"`와 `“대사”`를 지원합니다. 표기 안에 같은 기호를 그대로 넣으려면 `\*`, `\"`, `\\`로 이스케이프합니다. 닫히지 않은 표기나 내용이 빈 표기는 오류로 알리고 전송하지 않습니다. 한 번의 전송은 여러 사건으로 나뉘어도 게임 내 1분만 진행합니다. 자유 행동은 지문으로 기록하며, 이동·사물 상태 변경은 기존 이동·상호작용 버튼과 선언된 사건 반응 규칙에 따라 실행합니다.
-
-인물 한 명의 구조화된 응답을 검증할 때마다 행동·대사·메모를 저장하고 화면에 먼저 표시합니다. 다음 인물의 추론을 기다릴 필요가 없습니다. 화면은 생성 중 250ms 간격으로 진행 리비전을 확인하고 변경된 결과를 불러옵니다. 미완성 JSON이나 생성 중인 토큰은 표시하지 않습니다. 공연 화면에서는 **이야기가 이어지고 있어요**처럼 장면 중심의 안내를 사용합니다. 선택·모델 정보와 오류 상세는 별도 기록 정보에서 확인합니다.
-
-입력창은 화면 아래에 고정되고 대화 기록은 별도로 스크롤합니다. 새 내용이 표시되기 직전의 위치가 전체 스크롤 범위의 98% 이상이면 최신 내용으로 따라가며, 위쪽 기록을 읽고 있으면 현재 위치를 유지합니다. 읽던 위치에서 새 출력이 도착하면 **새 이야기 ↓**로 최신 내용으로 이동합니다. 좁은 화면에서는 세계관·슬롯과 주변 사물을 별도 창으로 열며, 이동 버튼과 입력 도움말은 필요할 때 펼칩니다.
-
-같은 장소에서 한 인물이 연속으로 말하거나 행동하면 턴이 달라도 하나의 묶음으로 읽고 이름은 한 번만 표시합니다. 상대가 바뀌면 묶음 안에 상대 표시를 추가하며, 다른 인물이 끼어들거나 장소가 바뀌면 새 묶음으로 나눕니다. 원래 사건·턴·기록 정보와 삽화의 순서는 유지합니다.
-
-자동 재시도 후에도 생성이 실패하면 상태 줄의 **다시 이어가기**를 누릅니다. 확정된 말·행동·기억과 대기 중인 입력은 보존하고, 재시도 시점에 현재 세션에 적용된 판단·생성 모델과 Provider 설정으로 실패 지점부터 다시 진행합니다. 모델을 바꿔 복구하려면 **메뉴 → 모델과 삽화 설정**에서 **모델 적용** 후 재시도합니다. **기본 설정 사용** 상태라면 현재 기본 모델을 사용합니다. 플레이어 입력이나 시간 진행을 반복하지 않습니다. 실패 이후 세계관을 편집하거나 진행을 불러온 경우에는 이전 작업을 재시도할 수 없습니다.
-
-캐릭터는 신뢰도·호감도·친밀도·존중도·경계도와 상대별 인식·근거를 비공개 상태로 보유합니다. 저장된 상대별 관계 항목이 없으면 모델 입력에 **모르는 사이(초면), 사전 친분 없음**을 명시합니다. 이름·소개·외모와 실제 대화 기록은 유지하며 이 기본값은 저장된 관계를 새로 만들거나 기존 기록을 수정하지 않습니다. 새 사건을 목격하면 생성 모델이 관계·메모를 먼저 해석하고, 그 결과로 행동 여부를 판단합니다. 기다리기를 골라도 관계는 바뀔 수 있습니다. 같은 사건을 다시 평가하지 않도록 해석 위치도 함께 저장합니다. 공연 화면의 **세계관과 현재 인물의 기억 → 상대별 관계**에서 확인하고 편집 화면에서 현재 관계를 수정할 수 있습니다. 작업실의 **배치·관계** 탭에서 상대를 선택하고 슬라이더·미평가 옵션·일반 문장으로 현재 관계와 초기 관계를 각각 수정합니다. 초기 관계와 출력 계약은 [캐릭터 관계 문서](docs/CHARACTER_RELATIONSHIPS.md)에 정리했습니다.
-
-화면 상단의 **메뉴 → 모델과 삽화 설정 → Provider 관리**에서 OEV 서버와 OpenAI 호환 API를 등록하고 모델 ID에 표시 별칭을 붙입니다. 판단에는 System One과 OpenAI Luna·Geniex의 Decision API를 선택할 수 있고, 생성·관계 해석에는 OEV와 OpenAI 호환 API를 사용할 수 있습니다. Provider 관리의 **OpenAI Luna 추가** 또는 **Geniex 추가**로 기본 설정을 채웁니다. Luna는 `OPENAI_API_KEY`를 사용하며 판단 전용 모델입니다. 판단 API 유형은 설정·HTTP 로그·행동 기록·작업 스냅샷에 구분해 보존합니다. 선택은 현재 세계관에 저장되고 다음 새 작업과 수동 재시도부터 적용됩니다. 진행 중인 작업과 서버 재시작 후 자동 재개는 저장된 실제 모델·주소·인증 정보를 유지합니다. **기본 설정 사용**으로 파일·환경 변수의 기본 모델로 돌아갈 수 있습니다. 이 선택은 진행 초기화·슬롯 불러오기에 영향을 받지 않으며, 다른 세계관의 선택과도 독립적입니다. [Provider 등록과 API 호환 옵션](docs/PROVIDERS.md)을 참고하세요.
-
-**메뉴 → 처음부터 다시**를 누르고 설정 창의 **현재 진행 초기화**를 선택하면 현재 세계관의 진행·대화·기억을 초기 배치로 되돌립니다. 저장 슬롯과 모델 선택은 유지됩니다. 창 안에서 초기화 전 공연 기록을 내려받을 수 있으며, 닫기나 Escape는 초기화하지 않습니다. 메뉴는 대화 기록을 스크롤해도 상단에 남습니다.
-
-편집 화면은 **세계관 / 씬 / 캐릭터·사물 / 배치·관계 / 고급** 탭으로 나뉩니다. 기존 씬의 이름·설명·나가는 길과 캐릭터의 소개·성격·말투·목표를 카드에서 수정합니다. 상태는 이름·종류·값으로 입력하며 JSON을 직접 쓸 필요가 없습니다. 배치 카드는 **지금의 모습 / 이야기 시작 시점**을 나눠 현재 진행과 초기 설정을 각각 편집합니다. 상호작용·자동 반응과 전체 정의 JSON은 고급 편집으로 유지합니다. [작업실 사용 안내](docs/EDITOR_GUIDE.md)를 참고하세요.
-
-진행은 세계관별로 자동 저장됩니다. 저장 슬롯 1~3은 세계관 정의와 현재 인스턴스·기억·사건을 함께 보관합니다. 세계관 내보내기에는 현재 진행과 슬롯이 포함되며, 공연 기록은 Markdown으로 내려받을 수 있습니다.
-
-공연 본문은 화자 이름·지문·따옴표 대사가 이어지는 각본 형태로 표시합니다. 장소는 장면이 바뀔 때 구분하며, **기록 정보 표시**를 켜면 각 사건의 진행 회차·사물 상태 변화·선택 기록을 확인할 수 있습니다.
-
-## OEV 설정
-
-**세계관과 무대 편집 → 세계관 → 서술 문체 지침**에서 문장 길이·어휘·묘사 방식 등을 프롬프트로 지정할 수 있습니다. 행동·대사 생성에만 적용하며 캐릭터별 말투와 JSON 분리는 유지합니다. 빈칸으로 저장하면 기본 문체를 사용합니다.
-
-플레이어와의 처음 관계는 최초 등장에 한 번, 인상착의는 최초 등장과 차림이 바뀐 뒤의 첫 등장에만 레이블 없는 문단으로 표시합니다. 과거 묘사는 당시 차림을 유지합니다. 작업실에서 외모·옷/음식 취향과 옷차림 후보를 편집합니다. 판단 모델은 첫 등장·날짜 변경, 또는 기본 180분 이상 지난 뒤 다른 씬에 등장할 때 옷을 다시 고를 수 있습니다. [인상착의와 저장 규칙](docs/CHARACTER_PRESENTATION.md)을 참고하세요.
-
-기본 연결은 [OEV 제공 문서](http://macstudio:12821/.skill)를 따릅니다. 별칭 없는 기본 OEV 모델은 `/v1/models`에서 `task=generation` 여부를 확인하며, 등록한 모델은 Provider의 별칭·용도를 확인합니다. 판단 기본 모델은 `gemma4-26b`이며 대사 모델을 비워두면 판단 모델과 같은 모델을 사용합니다.
-
-| 설정 | 기본값 | 역할 |
+| Role | API | Configuration |
 | --- | --- | --- |
-| `NEWERA_OEV_BASE_URL` | `http://macstudio:12821/v1` | 모델 검색·판단·대사 API |
-| `NEWERA_DECISION_MODEL` | `gemma4-26b` | `/systemone` 판단 모델 |
-| `NEWERA_TEXT_MODEL` | `gemma4-26b` (미지정 시 판단 모델과 동일) | `/chat/completions` 관찰·관계 해석과 상세 행동·대사·메모 생성 모델 |
-| `NEWERA_DECISION_TIMEOUT_MS` | `120000` | 모델 검색·판단 요청별 대기 시간 |
-| `NEWERA_LLM_TIMEOUT_MS` | `120000` | 구조화된 생성 요청별 대기 시간 |
-| `NEWERA_PLAYER_REPLY_TIMEOUT_MS` | `300000` | 플레이어를 향한 발언 뒤 실제 응답 대기 시간, 0~300000ms; 0이면 대기 생략 |
-| `NEWERA_GENERATION_HISTORY_TOKENS` | `32768` | 행동·대사 생성 전용 히스토리 추정 토큰 예산, 256~131072 |
-| `NEWERA_MAX_RETRIES` | `2` | 실패한 호출의 추가 재시도 횟수, 0~5 (0이면 비활성화) |
-| `NEWERA_RETRY_BASE_MS` | `1000` | 지수 백오프의 기본 대기 시간 |
-| `NEWERA_RETRY_MAX_MS` | `8000` | 백오프 대기 시간의 상한 |
-| `NEWERA_DATA_DIR` | `./data` | SQLite와 기본 모델 설정 파일 위치 |
-| `NEWERA_MODEL_CONFIG` | `<data>/models.json` | 선택적인 실행 중 모델 설정 파일 |
-| `NEWERA_PROVIDER_CONFIG` | `<data>/providers.json` | API 주소·인증·모델 별칭 등록 파일, GUI에서 편집 가능 |
-| `NEWERA_MEMORY_ENABLED` | `true` | LanceDB 장기기억 검색 사용 |
-| `NEWERA_EMBEDDING_MODEL` | `embeddinggemma2` | `/embeddings` 검색·문서 임베딩 모델 |
-| `NEWERA_EMBEDDING_DIMENSIONS` | `768` | 문서와 질의에 동일하게 적용하는 차원, 1~4096 |
-| `NEWERA_EMBEDDING_TIMEOUT_MS` | `10000` | 임베딩 요청별 대기 시간, 최대 120000ms |
-| `NEWERA_MEMORY_TOP_K` | `4` | 회상할 과거 사건 수, 1~8; 참여 판단에는 최대 2개 |
-| `NEWERA_MEMORY_MAX_BYTES` | `6000` | 회상 원문 JSON의 UTF-8 바이트 예산, 512~24000 |
-| `NEWERA_MEMORY_TOKENIZER` | `ngram` | `ngram` 또는 사전이 설치된 `lindera/ko-dic` |
-| `NEWERA_MEMORY_DIR` | `<data>/memory-lance` | 재구성 가능한 LanceDB 색인 저장 위치 |
+| System One decisions | `POST /v1/systemone` | Set the provider's decision API to `systemone`. Existing OEV providers use this by default. |
+| OpenAI Luna decisions | `POST /v1/decisions` | Use **Add OpenAI Luna**; the preset uses `gpt-6-luna`, `OPENAI_API_KEY`, and a decision-only alias. |
+| Geniex decisions | `POST /v1/decisions` | Use **Add Geniex**; its default base URL is `http://127.0.0.1:18181/v1`. |
+| Text generation and reflection | `POST /v1/chat/completions` | Use OEV or an OpenAI-compatible provider with working structured JSON output. |
 
-`models.json`은 다음 진행을 시작할 때 다시 읽습니다. 파일이 환경 변수보다 우선하며, 수락한 진행은 설정 스냅샷을 유지합니다. 잘못된 파일은 경고를 남기고 마지막 유효 설정을 유지합니다. 최초 설정이 잘못되었으면 생성을 실패시킵니다.
+Generation API type and decision API type are independent settings. Decision-only aliases appear in the decision selector, and embedding aliases are excluded from both play selectors. The application currently uses finite-choice questions for Decisions API integrations.
 
-행동·대사, 관찰·관계 해석, 삽화 프롬프트 생성에는 앱이 `max_completion_tokens`나 `max_tokens`를 보내지 않습니다. 출력 길이는 Provider의 기본 설정과 모델 문맥 한도를 따릅니다. 기존 `NEWERA_MAX_OUTPUT_TOKENS`·`NEWERA_REFLECTION_MAX_OUTPUT_TOKENS` 환경 변수와 `models.json`의 `maxOutputTokens`·`reflectionMaxOutputTokens`는 무시합니다. `NEWERA_GENERATION_HISTORY_TOKENS`는 입력 히스토리 예산으로 계속 적용합니다.
+After saving a provider, the upper **Refresh list** button (`목록 새로고침`) queries registered servers and saves new models as aliases. Existing aliases, their custom names and purposes, and saved world selections are retained. A failed server does not prevent other available providers from contributing models. Opening the settings alone does not import aliases. Within Provider management, **Fetch server models** adds editable drafts; save the provider to register those drafts.
 
-```json
-{
-  "baseUrl": "http://macstudio:12821/v1",
-  "decisionModel": "gemma4-26b",
-  "textModel": "gemma4-26b",
-  "decisionTimeoutMs": 120000,
-  "timeoutMs": 120000,
-  "maxRetries": 2,
-  "retryBaseMs": 1000,
-  "retryMaxMs": 8000
-}
-```
+### Structured output compatibility
 
-환경 변수와 `.env`, SQLite 위치를 변경하면 서버를 재시작해야 합니다. 환경 변수는 프로세스 시작 입력이고 SQLite 연결은 한 데이터 디렉터리에 묶여 있습니다.
+Choose **JSON Schema** or **JSON object** under the provider's advanced API options. JSON object mode also sends schema instructions in the conversation. Both modes use the same application-side validation; malformed output is not accepted as plain text.
 
-앱 서버 콘솔에는 타임스탬프가 있는 JSON 로그를 한 줄씩 출력합니다. `[OEV] 요청 시작 / HTTP 응답 수신 / 요청 실패`에는 요청 ID, 실제 Provider·모델, 작업 종류·시도 횟수, 전송·응답 크기, 시간 제한과 소요 시간을 남깁니다. `HTTP 응답 수신`은 전송 완료이며 모델 출력 검증 성공을 뜻하지 않습니다. 응답에는 `finishReason`, 실제 토큰 사용량과 본문·추론 길이도 기록합니다. Provider가 제공하지 않은 사용량은 생략합니다.
+A successful Geniex `/decisions` request does **not** establish that its `/chat/completions` endpoint can enforce the required output format. If reflection or action generation repeatedly fails JSON validation, use a generation server with working structured output while keeping Geniex for decisions. A standalone `llama-server` can be registered as an OpenAI-compatible generation provider; validate it with the chosen model and output mode before using it for a session.
 
-출력 오류는 `[추론] 출력 검증 실패`, 재시도는 `[추론] 재시도 예약`, 최종 실패는 `[추론] 재시도 소진` 또는 `[추론] 실패`로 구분합니다. `stage/code/reason`으로 잘림·JSON 파싱·행동 필드·검수 거절을 확인하고, `operationId`로 한 작업의 여러 시도를, `requestId`로 해당 HTTP 응답을 연결합니다. 장면 작업은 `worldId/jobId/actorId`, 검수 요청은 `parentRequestId`로 원래 생성 요청까지 연결됩니다. 대화·개인 메모·원본 모델 출력·추론 내용·API 키는 기록하지 않습니다. [로그 읽는 법과 오류 코드](docs/PROVIDERS.md#추론-로그)를 참고하세요.
+Provider settings are shared across worlds, while model selections belong to each world. Accepted jobs pin their provider routes and models, including across server restarts. Apply new settings and use the manual retry control to retry a failed job with the current configuration.
 
-일시적 HTTP 오류(408·429·500·502·503·504), 연결 실패·요청 시간 초과, 잘못된 판단·JSON·스키마·잘린 생성 결과는 해당 호출만 재시도합니다. 기본값은 최초 시도 후 최대 2회 추가하며 약 1초·2초를 기다립니다. 대기에는 ±20% 지터를 적용하고 최대 간격을 넘기지 않습니다. 설정·모델 선택 오류와 그 외 HTTP 오류는 즉시 실패하며, 장면 변경·실행권 상실·취소는 다음 요청을 막습니다. 성공한 판단이나 이미 확정된 행동은 다시 실행하지 않습니다. 생성 형식 검증은 재시도 때도 동일하게 적용합니다. 한도를 초과하면 시도 횟수와 오류를 표시합니다.
+See [Providers and model aliases](docs/PROVIDERS.md) for setup, choice limits, authentication, configuration files, retries, and inference diagnostics.
 
-판단은 `/systemone`의 `participation` choice로 **참여한다(`act`) / 새로 참여하지 않는다(`wait`)**를 고릅니다. `wait`인 경우에만 별도 요청의 `inactivity` choice로 **지켜본다(`watch`) / 하던 일을 계속한다(`continue`) / 아무것도 하지 않는다(`idle`)**를 구분합니다. `watch`만 지켜보는 행동을 기록하고, 뒤의 두 선택은 내부 상태만 저장하며 새 사건·대사·기억·작업 완료를 만들지 않습니다. 비참여는 상세 행동 생성을 생략하며 다른 사건이 생기면 다시 판단합니다. 그 전에 새 목격 사건이 있으면 생성 모델이 `character_reflection` 스키마로 관계·개인 메모를 해석합니다. 미처리 사건을 최대 4개씩 처리하며 새 사건이 없으면 해석 호출도 생략합니다. 행동할 때는 `/chat/completions`에 `response_format: json_schema`를 보내 실제 행동·대상·묘사·대사·개인 메모를 추론합니다. `actionId`는 현장에서 실행할 수 있는 모든 행동 ID 중에서 생성 모델이 선택하며, 대상과 효과는 실행기가 해당 ID로 확인합니다. 기존 `noul`·`score` 질문과 반응 임계값, 후보 묶음 판단은 사용하지 않습니다.
+## Playing
 
-요청마다 목적에 맞는 입력을 따로 구성합니다. 참여 판단은 세계관 전문·옷/음식 취향·저장용 필드를 제외하고 성격·목표·현재 상태/메모·현장과 사건 관련 관계·최근 목격 사건 6개를 보냅니다. 마지막 플레이어 입력과 자기 행동이 그 범위 밖에 있으면 추가해 최대 8개를 유지합니다. 같은 사건은 한 번만 전달하고 주체·대상·행동/대사·상태 효과 원문을 보존합니다. 비참여 태도는 최근 사건 3개와 마지막 플레이어/자기 기록, 현재 활동·의도·감정만 보며, 옷차림은 시각·장소·옷 취향·현재 차림·마지막 선택과 의상 후보만 받습니다. 상세 생성에만 세계관 규칙·외모·취향을 전달합니다. 관계 해석에는 새 사건과 과거 근거를 중복 없이 나누고, 각 배치의 저장 위치를 확정한 뒤 다음 배치를 요청합니다. 단계별 자동 재시도는 실패한 호출만 반복합니다.
+The first launch opens **The Theater After the Rain** (`비가 그친 뒤의 극장`). Characters and objects respond to events in the current scene; offstage characters are not simulated independently.
 
-발언 입력에는 고정 화자 ID·이름과 사건별 실제 화자·대상 이름을 명시합니다. 생성 후에는 약 1KB의 `identity_check`로 고정 화자와 자기소개의 모순을 먼저 검수하고, 통과하면 별도 `performance_check`로 플레이어 답변 대행·답을 기다리는 질문의 무의미한 반복을 검수합니다. 정체성 검사는 혼동된 과거 대사나 메모를 사실로 따라가지 않도록 기본 설정과 새 제안만 받습니다. 의미 있는 재반응은 허용하며 발언 횟수로 장면을 종료하지 않습니다. 검수에서 거절된 제안은 수정 지침과 함께 제한적으로 재생성하며, 통과하기 전에는 대사나 메모를 저장하지 않습니다. 미완성 플레이어 이름 자리표시자는 실행기에서도 거절합니다. 이 검수는 모델 판단이므로 모든 의미 오류를 보장해서 찾는 검사는 아닙니다.
+- **Speak or act:** enter `*nods* "Let's begin."`. Asterisks mark actions, and straight or curly double quotes mark speech. Unmarked text is treated as speech. Mixed input preserves its original order; a single submission advances game time by one minute.
+- **Choose a recipient:** address everyone present or a specific character. Fewer than eight characters use selectable tags; eight or more use a dropdown. Characters in other scenes do not receive the input.
+- **Interact or move:** use the available object interactions and connected exits. Declared rules apply state changes, and companions follow as the same instances. Freeform action text alone does not execute movement or object effects.
+- **Watch for a while** (`잠시 지켜본다`): advance game time by five minutes and let the scene react. This also works during a player reply window.
+- **Pause and resume:** pause automatic progression while retaining confirmed events and queued input, then resume from the saved position.
 
-출력 필드는 `actionId`, `targetId`, `parts`, `memoUpdate`입니다. `parts`에는 **행동 묘사(`act`)와 대사(`speak`)를 합쳐 1~6개**까지 원하는 순서로 넣습니다. 각 조각은 `kind`와 `text`를 가지며 행동·대사를 짝지을 필요가 없습니다. 행동만, 대사만, 연속된 대사, 행동 → 대사 → 행동처럼 출력할 수 있습니다. 예를 들어 `[{"kind":"act","text":"벽시계를 본다."},{"kind":"speak","text":"조금만 기다려 주세요."},{"kind":"act","text":"대본을 내려놓는다."}]`를 순서대로 표시하고 기억합니다. 말없는 몸짓에는 `act` 행동 후보를 사용하며, 이동·상호작용 효과는 조각 수와 관계없이 한 번 적용합니다. 플레이어를 향한 대사가 포함된 반응은 전체 표현을 확정한 뒤 답변을 기다립니다.
+When a character speaks to the player, progression waits up to **five real-world minutes** for a reply. A countdown appears above the input. Sending a reply continues immediately; an unsent draft does not count as a reply. **Continue now** (`지금 이어가기`) skips only the reply window, without advancing game time or inventing player dialogue. The deadline survives refreshes and restarts.
 
-모델이 대상과 본문을 생성하면 실행기가 실제 행동 주체의 ID를 붙입니다. 대상은 선택한 행동의 대상과 일치해야 하며 모델이 `actorId`를 출력하는 것은 거부합니다. 말하기에는 대사 조각이, 말없는 행동·이동·상호작용에는 행동 조각이 필요합니다. 전체 행동 묘사는 2000자, 전체 대사는 4000자 이내입니다. 메모 갱신은 자신의 요약·현재 의도·감정·미해결 문제 전체를 교체하고, null이면 기존 메모를 유지합니다. 다른 인물의 입력에는 이 메모를 전달하지 않습니다. JSON 파싱·필드와 길이·실행 가능성을 클라이언트에서도 검증하며, 7개 이상이거나 잘못된 조각은 전체 제안을 거절합니다. 이전 `narrative`·`utterance` 형식의 구조화된 제안과 기록은 계속 읽되 새 생성 스키마는 `parts`를 요청합니다. 평문으로 자동 전환하지 않습니다.
+Each generated expression contains **one to six ordered action or speech parts**. They can appear independently or consecutively; action/dialogue pairs are not required. Consecutive events by the same character in the same scene render as one group, even across turns. Recipient changes remain visible within that group.
 
-목격 기억은 `actorId`(주체), `targetId`(대상), `kind`(사건 종류), `body.parts`(행동·대사 원래 순서)를 가진 JSON으로 저장·전달합니다. `body.narrative`(행동)와 `body.utterance`(발언)는 종류별로 모은 호환 필드입니다. 화면·기억·검수·생성 히스토리·내보내기는 `parts` 순서를 유지하고, 완전 중복 비교도 순서를 구분합니다. 플레이어의 행동을 NPC 기억에 `나:`라는 문장으로 쓰지 않습니다. 기존 문자열 기억은 연결된 사건 ID에서 주체와 본문을 복원하고, 원래 사건을 찾을 수 없는 문자열은 보존하되 모델에게 주체를 추측시켜 전달하지 않습니다.
+Characters receive opportunities according to reaction speed, talkativeness, and current arousal. They may act, watch, continue their existing activity, or remain idle. Newly witnessed events can update private relationships and memories before a character decides whether to act. Exact repetitions of a character's last actual action are suppressed without duplicating events or effects.
 
-개인의 최근 목격 기억에 더해, 최근 16개 밖에 있는 사건은 LanceDB BM25와 OEV `embeddinggemma2` 벡터 검색의 순위를 결합해 회상합니다. 참여 판단과 검수에는 `recentEvents`와 별도의 `recalledEvents`로 전달합니다. 임베딩 장애 시 BM25로 진행하고 검색 전체 장애는 `unavailable`로 구분합니다. [장기기억 검색과 설정](docs/MEMORY_SEARCH.md)에 저장·복원·한국어 검색 규칙을 정리했습니다.
+Confirmed expressions appear as they are committed; the interface does not display unfinished JSON or raw token streams. The transcript follows new events when you are near the bottom and preserves your reading position when you scroll back. System, dark, and light themes and story font sizes are available in the **Appearance** (`화면`) menu and are remembered in the browser.
 
-행동·대사 생성에는 해당 인물이 목격한 확정된 대화·행동·씬 출발/도착을 순서대로 이어받는 `history`를 전달합니다. 기본 **약 32K 추정 토큰**을 넘으면 가장 오래된 사건부터 제외하고, SQLite 원본은 보존합니다. 세계관·성격·현재 상태·행동 후보는 이 히스토리 예산 밖이며 typed decision·관계 해석의 입력은 확대하지 않습니다. [생성 히스토리 예산](docs/GENERATION_HISTORY.md)을 참고하세요.
+If generation fails after automatic retries, apply any model or provider corrections and use the retry control in the status area. Confirmed events, memories, queued input, and consumed game time are preserved. A retry does not resubmit the player's turn.
 
-캐릭터가 없는 씬은 모델 연결 없이 진행할 수 있습니다. 플레이어 입력과 각 인물의 결과는 순서대로 확정합니다. 이후 모델이나 검증에 실패해도 앞서 확정한 결과는 유지하며 실패한 결과만 적용하지 않습니다. 실행 중 서버가 재시작되면 저장된 반응 대기열과 채팅 소비 위치에서 이어가므로 입력이나 완료된 행동을 중복 적용하지 않습니다. 이후의 새로운 사건으로 같은 인물을 다시 판단하는 것은 별도의 반응입니다.
+## Creating and editing worlds
 
-대화 목적·질문/응답 대기·인물별 과제와 계획/표현 분리는 아직 구현하지 않았습니다. 다음 변경의 검토안은 [대화 상태와 컨텍스트 설계](docs/CONVERSATION_CONTEXT_DESIGN.md)에 정리했습니다.
+The workshop at `/lores` provides tabs for worlds, scenes, character/object templates, placements and relationships, and advanced rules. Edit current state separately from the story's starting state. Object interactions and automatic reactions can be authored in the advanced editor.
 
-## 이미지 생성 클라이언트
+Unsaved edits survive tab, search, and relationship-target changes within the editor. Drafts are **not autosaved**: save each edited item before leaving. The workshop shows unsaved changes and asks before navigation or refresh would discard them.
 
-**이미지 생성 프리셋**(`/images`)에서 OpenAI·Grok(xAI)·OpenRouter·ComfyUI의 서버·모델·화풍과 생성 옵션을 이름으로 저장하고 복사·수정합니다. ComfyUI는 **ZIT · Moody Minimal / SDXL · Simple / Anima · Preview** 워크플로우를 제공하며 기본 서버는 `http://localhost:22222`입니다. 네 Provider 모두 서버에서 모델을 조회해 선택할 수 있고, 외부 API 모델은 이미지 생성용 목록에서 이름·ID로 검색할 수 있습니다. OpenAI는 기능 정보가 없어 GPT Image 계열 ID로 필터링합니다. 직접 모델 ID를 입력할 수도 있습니다. 외부 API 키는 환경 변수 이름으로만 참조합니다.
+World progress is saved automatically. Each world also has three manual save slots containing its definition, instance state, memories, and events. Export a world with its progress and slots as JSON, or download the performance transcript as Markdown.
 
-공연 화면의 **모델 설정 → 이미지 생성 프리셋**에서 세션에 사용할 프리셋을 선택합니다. 생성 조건은 **로어북 작업실 → 세계관 → 로어북 · 이미지 생성**에 자연어로 작성하고, 태그 또는 자연어 프롬프트 형식과 작성 지침을 지정합니다. 예를 들어 “중요한 만남이 있거나 게임 내 시각이 18시 이후인 극장 입구를 그린다”라고 쓸 수 있습니다. 프리셋 미선택 또는 빈 조건이면 자동 요청하지 않습니다. 동봉된 극장·솔빛고·하온대에는 장소 변경·인물 등장·분위기 전환에 맞춘 [기본 이미지 규칙](docs/IMAGE_GENERATION.md#동봉-로어의-기본-규칙)이 들어 있으며, 세션에서 이미지 프리셋을 선택하면 사용합니다.
+### Bundled worlds
 
-새 진행이 확정되면 판단 모델이 **System One으로 생성/생략을 결정**하고, 생성일 때만 생성 모델이 **이미지 프롬프트를 작성**한 뒤 선택한 프리셋에 요청합니다. 삽화는 SQLite에 저장해 대화 기록에 표시하며 새로고침·서버 재시작에도 유지합니다. 이미지 프리셋은 세션의 운영 설정, 조건과 작성 지침은 내보내기·가져오기·저장 슬롯에 포함되는 로어북 내용입니다. ComfyUI 결과는 `SaveImageWebsocket`으로 수신합니다. [설정과 사용 예](docs/IMAGE_GENERATION.md)를 참고하세요.
+Import a preset through the workshop to start a separate world. The source files and background guides are included for further editing.
 
-## 데이터 형식
+| World | Setting | Contents | Files |
+| --- | --- | --- | --- |
+| The Theater After the Rain | A small theater and its residents | 3 scenes, 3 characters, 2 objects | [Import preset](static/lore-presets/theater-opening.json) |
+| Solbit High: Ten Days Until the Autumn Festival | Korean school life, clubs, a festival, and a light mystery | 44 scenes, 25 characters, 49 objects | [Import preset](static/lore-presets/solbit-high.json) · [Source](lore-sources/solbit-high.json) · [Guide](docs/SOLBIT_HIGH.md) |
+| Haon University: A First Semester at Twenty-One | Adult campus romance and a first group assignment | 29 scenes, 10 characters, 38 objects | [Import preset](static/lore-presets/haon-university.json) · [Source](lore-sources/haon-university.json) · [Guide](docs/HAON_UNIVERSITY.md) |
 
-씬 기반 `newera-theater` version 2만 사용합니다. 세계관·진행·저장 슬롯·생성 작업은 `data/newera.sqlite`의 `theater_*` 테이블에 저장합니다. 구형 형식의 가져오기와 자동 이전은 지원하지 않습니다.
+See the [Workshop guide](docs/EDITOR_GUIDE.md) and [World JSON guide](docs/LORE_JSON_GUIDE.md) for authoring details.
 
-## 검증과 작성 도구
+## Optional illustrations
+
+At `/images`, create named presets for **OpenAI, xAI, OpenRouter, or ComfyUI**, then select a preset in the session's model and illustration settings. Presets own the image server, model, style, and options. The world's lorebook owns the natural-language generation conditions and prompt instructions.
+
+After story progress is committed, the decision model selects whether to illustrate it. If approved, the generation model writes a tag-based or natural-language prompt, and the selected image provider creates the illustration. Images are stored in SQLite and displayed alongside the transcript. ComfyUI uses `SaveImageWebsocket` output.
+
+Automatic illustration requests require both a selected preset and nonempty world conditions. See [Image generation](docs/IMAGE_GENERATION.md) for provider configuration and workflow requirements.
+
+## Configuration and local data
+
+The optional `data/models.json` file overrides corresponding environment defaults. Use `NEWERA_MODEL_CONFIG` to choose another path. Provider registration is stored separately in `data/providers.json` and can be edited through the interface.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `NEWERA_OEV_BASE_URL` | `http://macstudio:12821/v1` | Initial default OEV address, used before a provider registry is saved. |
+| `NEWERA_DECISION_MODEL` | `gemma4-26b` | Default decision model or `provider-id::alias-id` reference. |
+| `NEWERA_TEXT_MODEL` | Decision model | Default generation and reflection model or alias reference. |
+| `NEWERA_DECISION_TIMEOUT_MS` | `120000` | Per-request timeout for model discovery and decisions. |
+| `NEWERA_LLM_TIMEOUT_MS` | `120000` | Per-request timeout for Chat Completions. |
+| `NEWERA_PLAYER_REPLY_TIMEOUT_MS` | `300000` | Real-time player reply window; `0` disables it, maximum `300000`. |
+| `NEWERA_GENERATION_HISTORY_TOKENS` | `32768` | Estimated history-token budget for action/dialogue generation. |
+| `NEWERA_MAX_RETRIES` | `2` | Additional attempts for retryable failures; `0` disables retries. |
+| `NEWERA_RETRY_BASE_MS` / `NEWERA_RETRY_MAX_MS` | `1000` / `8000` | Exponential retry backoff settings. |
+| `NEWERA_DATA_DIR` | `./data` | SQLite database and default configuration directory. |
+| `NEWERA_MODEL_CONFIG` | `<data>/models.json` | Optional runtime model settings file. |
+| `NEWERA_PROVIDER_CONFIG` | `<data>/providers.json` | Provider registry file. |
+| `NEWERA_MEMORY_ENABLED` | `true` | Enable long-term memory retrieval. |
+
+Valid model settings and provider files are reread for new jobs and manual retries; existing jobs retain their accepted snapshots. After a registry has been saved, edit the default provider's address there rather than changing only `NEWERA_OEV_BASE_URL`. Environment variables, configuration-file path changes, and the SQLite data directory require a server restart.
+
+Character memory combines recent witnessed events with optional **LanceDB BM25 and embedding retrieval**. Embedding failures fall back to BM25; broader retrieval failures are reported separately. Embeddings can use their own provider alias. See [Memory search](docs/MEMORY_SEARCH.md) and [Generation history](docs/GENERATION_HISTORY.md) for retrieval settings and context budgets.
+
+Worlds, progress, slots, generation jobs, and illustrations are stored in `data/newera.sqlite`. The supported import/export format is **`newera-theater`, version 2**; older formats are not automatically migrated. Memory indexes live separately under `data/memory-lance` by default.
+
+**Keep local settings and database backups private.** Directly entered provider keys are stored in the local provider file, and resolved keys are retained in server-side job snapshots for recovery. These credentials are excluded from page data, world exports, and transcript exports.
+
+The server emits structured JSON logs with request IDs, provider/model details, API type, timings, usage when available, and validation/retry diagnostics. Raw conversations, private memos, model output, reasoning content, and API keys are not logged. The legacy `[OEV]` event label is also used for other providers; inspect the provider and `decisionApi` fields to identify the actual route.
+
+## Development and validation
 
 ```powershell
 npm run check
 npm test
 npm run test:integration
+```
+
+`check` runs Svelte/TypeScript diagnostics. `test` runs the unit suites. `test:integration` builds the app and runs integration tests with local fixture servers and isolated data directories; it does not establish compatibility with every external model server.
+
+The repository also includes lore authoring commands:
+
+```powershell
 npm run lore:build -- skills/newera-lore-authoring/assets/example-source.json output.json
 npm run lore:validate -- output.json
 ```
 
-구조와 실행 규칙은 [PRODUCT](docs/PRODUCT.md), 파일 형식과 오브젝트 예제는 [세계관 JSON 안내](docs/LORE_JSON_GUIDE.md)를 참고하세요.
+## Further documentation
 
-동적 동행과 반복 반응 등 다음 확장 및 현재 반영 범위는 [반응형 씬 실행기 확장 설계](docs/REACTIVE_SCENE_DESIGN.md)에 정리했습니다.
+The detailed guides are currently in Korean.
+
+- [Product structure and runtime rules](docs/PRODUCT.md)
+- [Providers, API contracts, retries, and logs](docs/PROVIDERS.md)
+- [Workshop guide](docs/EDITOR_GUIDE.md) and [World JSON format](docs/LORE_JSON_GUIDE.md)
+- [Character relationships](docs/CHARACTER_RELATIONSHIPS.md) and [Character presentation](docs/CHARACTER_PRESENTATION.md)
+- [Reaction speed](docs/REACTION_SPEED_DESIGN.md) and [Bundled reaction profiles](docs/LORE_REACTION_PROFILES.md)
+- [Memory search](docs/MEMORY_SEARCH.md) and [Generation history](docs/GENERATION_HISTORY.md)
+- [Image generation](docs/IMAGE_GENERATION.md)
+- [Reactive scene design](docs/REACTIVE_SCENE_DESIGN.md) and [Conversation context proposal](docs/CONVERSATION_CONTEXT_DESIGN.md)
+
+Design documents include proposals as well as delivered behavior. Semantic conversation goals and a separate character planning/expression pipeline remain proposed work; the implemented timed player reply window is described above.
+
+## License
+
+This project is licensed under the Mozilla Public License 2.0. See [LICENSE](LICENSE) for the full text.
