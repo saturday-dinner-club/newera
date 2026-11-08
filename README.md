@@ -41,6 +41,7 @@ Open **Menu → Model and illustration settings → Provider management** (`메�
 | Role | API | Configuration |
 | --- | --- | --- |
 | System One decisions | `POST /v1/systemone` | Set the provider's decision API to `systemone`. Existing OEV providers use this by default. |
+| TypeSafe Jev decisions | `POST /v1/systemone` | Register `https://api.typesafe.ai/v1` with a key and the System One decision API. Native `models[].name` listings are imported as decision-only aliases. |
 | OpenAI Luna decisions | `POST /v1/decisions` | Use **Add OpenAI Luna**; the preset uses `gpt-6-luna`, `OPENAI_API_KEY`, and a decision-only alias. |
 | Geniex decisions | `POST /v1/decisions` | Use **Add Geniex**; its default base URL is `http://127.0.0.1:18181/v1`. |
 | Text generation and reflection | `POST /v1/chat/completions` | Use OEV or an OpenAI-compatible provider with working structured JSON output. |

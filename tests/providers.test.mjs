@@ -290,3 +290,37 @@ test('decision-only Luna aliases appear only among decision options and discover
 	globalThis.fetch = async () => new Response(JSON.stringify({ data: [{ id: 'gpt-6-luna' }] }));
 	assert.deepEqual((await discoverProviderModels('judge', new AbortController().signal)).models, [{ id: 'gpt-6-luna', task: 'decision' }]);
 });
+
+test('native TypeSafe catalogs discover and persist decision-only aliases with either provider kind', async (t) => {
+	environment(t);
+	const calls = [];
+	globalThis.fetch = async (url, init) => {
+		calls.push({ url: String(url), authorization: init.headers.authorization });
+		return new Response(JSON.stringify(String(url).includes('typesafe.test') ? {
+			models: [{ name: 'jev-latest', description: 'Latest System One model', release_date: '2026-10-22T02:00:00+00:00' }, { name: 'jev-preview', description: 'Preview', release_date: '2026-10-14T20:14:00+00:00' }]
+		} : { data: [{ id: 'legacy', task: 'generation' }] }));
+	};
+	for (const kind of ['oev', 'openai-compatible']) {
+		add(config('typesafe', kind, { decisionApi: 'systemone', apiKey: 'typesafe-secret', models: [] }));
+		assert.deepEqual((await discoverProviderModels('typesafe', AbortSignal.timeout(1000))).models, [{ id: 'jev-latest', task: 'decision' }, { id: 'jev-preview', task: 'decision' }]);
+		const catalog = await refreshModelCatalog(AbortSignal.timeout(1000));
+		const options = catalog.options.filter(option => option.providerId === 'typesafe');
+		assert.equal(options.length, 2);
+		assert.ok(options.every(option => option.decision && !option.generation && option.decisionApi === 'systemone'));
+		assert.equal(resolveProviderModel(defaults, options[0].value, 'decision').model, 'jev-latest');
+		assert.throws(() => resolveProviderModel(defaults, options[0].value, 'generation'), /용도/);
+	}
+	assert.ok(calls.filter(call => call.url.includes('typesafe.test')).every(call => call.url.endsWith('/v1/models') && call.authorization === 'Bearer typesafe-secret'));
+});
+
+test('native TypeSafe discovery rejects missing model names and malformed lists without saving aliases', async (t) => {
+	environment(t);
+	add(config('typesafe', 'openai-compatible', { decisionApi: 'systemone', models: [] }));
+	for (const payload of [{ models: {} }, { models: [{ id: 'not-a-name' }] }, { models: [{ name: '' }] }, { models: [null] }]) {
+		globalThis.fetch = async () => new Response(JSON.stringify(payload));
+		await assert.rejects(discoverProviderModels('typesafe', AbortSignal.timeout(1000)));
+		assert.deepEqual(getProviders(defaults).providers.find(provider => provider.id === 'typesafe').models, []);
+	}
+	globalThis.fetch = async () => new Response(JSON.stringify({ models: [] }));
+	assert.deepEqual((await discoverProviderModels('typesafe', AbortSignal.timeout(1000))).models, []);
+});

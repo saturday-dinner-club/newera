@@ -18,6 +18,8 @@ API 키는 저장 후 브라우저에 다시 보내지 않습니다. 입력란�
 
 ## API 호환 옵션
 
+TypeSafe(`https://api.typesafe.ai/v1`)는 판단 API를 **System One**으로 지정합니다. [공식 모델 목록 명세](https://api.typesafe.ai/docs)에 맞춰 `models[].name` 형식도 읽으며, 조회한 모델은 판단 전용 별칭으로 등록합니다. `jev-latest`, `jev-preview` 같은 모델은 문장 생성 목록에 표시하지 않습니다. 문장 생성에는 별도 Chat Completions Provider를 선택합니다. OEV와 OpenAI 호환 서버의 기존 `data[].id` 모델 목록도 계속 지원합니다.
+
 | 옵션 | 동작 |
 | --- | --- |
 | JSON Schema | 생성 요청에 기존 `response_format.json_schema` 계약을 전달합니다. |

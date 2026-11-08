@@ -352,6 +352,10 @@ export async function discoverProviderModels(id: string, signal: AbortSignal): P
 	const settings = modelSettings();
 	const route = providerCatalogRoute(settings, id);
 	const catalog = await withRetries('Provider 모델 목록 조회', settings, signal, () => request(settings, '/models', signal, undefined, route));
+	// TypeSafe's native System One catalog uses models[].name and has no text-generation models.
+	if (decisionApiFor(route) === 'systemone' && Array.isArray(catalog.models)) {
+		return { models: catalog.models.map(entry => ({ id: text(record(entry, 'System One 모델').name, '실제 모델 ID', 200), task: 'decision' as const })) };
+	}
 	if (!Array.isArray(catalog.data)) throw new Error('Provider의 모델 목록 형식이 올바르지 않습니다.');
 	return { models: catalog.data.flatMap((entry) => {
 		const model = record(entry, 'Provider 모델');
