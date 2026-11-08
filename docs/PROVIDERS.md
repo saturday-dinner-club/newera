@@ -22,8 +22,10 @@ TypeSafe(`https://api.typesafe.ai/v1`)는 판단 API를 **System One**으로 지
 
 | 옵션 | 동작 |
 | --- | --- |
-| JSON Schema | 생성 요청에 기존 `response_format.json_schema` 계약을 전달합니다. |
+| JSON Schema | `response_format.json_schema`를 전달합니다. OpenAI 호환 서버에는 아래의 배열 제약 세 개를 제외한 스키마를 보냅니다. |
 | JSON 객체 | `response_format: {"type":"json_object"}`와 스키마 지침을 전달하고, 앱이 동일한 출력 계약을 검증합니다. |
+
+ArliAI처럼 JSON Schema 일부만 지원하는 서버를 위해 OpenAI 호환 생성 요청에서는 `contains`, `minContains`, `uniqueItems`를 제외합니다. 이 세 조건은 관찰·관계 해석의 근거 사건 배열에 사용됩니다. 새 목격 사건을 근거로 포함하는지와 허용된 사건 ID인지는 앱에서 계속 검증하고, 근거 ID 중복도 기존처럼 정리합니다. 필수 필드·타입·후보 enum·배열 길이 제약은 전달하며, OEV의 원본 스키마와 JSON 객체 모드의 전체 스키마 지침은 유지합니다. `Grammar error: Unimplemented keys` HTTP 400은 생성 결과 오류가 아니라 서버가 요청 스키마를 받아들이지 못했다는 뜻이며 같은 요청을 반복해도 해결되지 않습니다.
 
 OpenAI 호환 생성 요청에는 OEV 전용 `input_type`, `reasoning_effort`, `temperature`를 보내지 않습니다. 모든 생성 Provider에 `max_completion_tokens`와 `max_tokens`를 생략하며 출력 길이는 Provider의 기본 설정과 모델 문맥 한도를 따릅니다. 기존 `outputTokenParameter`는 저장 데이터 호환을 위해 읽고 보존하지만 요청에는 적용하지 않습니다. JSON 객체 모드에서도 행동·대사 분리와 필드·실행 가능성 검증을 유지하며, 평문으로 자동 전환하지 않습니다. Provider가 선택한 구조화 출력 방식을 지원해야 합니다. 이 기능은 Chat Completions 호환 API를 대상으로 하며 Responses 전용 API는 지원하지 않습니다.
 

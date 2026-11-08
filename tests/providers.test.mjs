@@ -123,6 +123,55 @@ test('JSON object providers still receive schema guidance and host output valida
 	assert.ok(!('max_completion_tokens' in generated.body) && !('max_tokens' in generated.body));
 });
 
+const reflectionEvents = [{ eventId: 'past', actorId: 'player', kind: 'speak', body: { utterance: '이전 이야기' } }, { eventId: 'fresh', actorId: 'player', kind: 'speak', body: { utterance: '새 이야기' } }];
+const reflectionContext = { newEvents: reflectionEvents.slice(1), evidenceEvents: reflectionEvents, targets: [{ id: 'player', name: '플레이어' }] };
+const noReflection = { relationshipUpdates: [], memoUpdate: null, arousalUpdate: null };
+
+test('compatible JSON Schema reflection avoids unsupported grammar keys while native OEV retains them', async (t) => {
+	environment(t); add(config('one'));
+	for (const kind of ['oev', 'openai-compatible']) {
+		add(config('two', kind));
+		const calls = fakeProvider();
+		const director = await createDirector(new AbortController().signal, selection);
+		assert.deepEqual(await director.reflect(state, reflectionContext), noReflection);
+		const format = calls[0].body.response_format;
+		assert.equal(format.type, 'json_schema');
+		assert.equal(format.json_schema.name, 'character_reflection');
+		assert.equal(format.json_schema.strict, true);
+		const schema = format.json_schema.schema;
+		const relationEvidence = schema.properties.relationshipUpdates.items.properties.evidenceEventIds;
+		const arousalEvidence = schema.properties.arousalUpdate.anyOf[1].properties.evidenceEventIds;
+		for (const evidence of [relationEvidence, arousalEvidence]) {
+			assert.equal(evidence.minItems, 1);
+			assert.equal(evidence.maxItems, 8);
+			assert.deepEqual(evidence.items.enum, ['past', 'fresh']);
+			for (const key of ['contains', 'minContains', 'uniqueItems']) assert.equal(Object.hasOwn(evidence, key), kind === 'oev');
+		}
+		assert.deepEqual(schema.required, ['relationshipUpdates', 'memoUpdate', 'arousalUpdate']);
+		assert.equal(schema.additionalProperties, false);
+	}
+});
+
+test('compatible reflection still rejects stale or invented evidence and normalizes duplicate IDs', async (t) => {
+	environment(t); add(config('one')); add(config('two', 'openai-compatible'));
+	const previousRetries = process.env.NEWERA_MAX_RETRIES;
+	process.env.NEWERA_MAX_RETRIES = '0';
+	t.after(() => { if (previousRetries === undefined) delete process.env.NEWERA_MAX_RETRIES; else process.env.NEWERA_MAX_RETRIES = previousRetries; });
+	let proposal;
+	globalThis.fetch = async () => new Response(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(proposal) } }] }));
+	const director = await createDirector(new AbortController().signal, selection);
+	for (const evidenceEventIds of [['past'], ['invented']]) {
+		proposal = { ...noReflection, relationshipUpdates: [{ targetId: 'player', changes: [{ field: 'trust', value: 35 }], impression: null, evidenceEventIds }] };
+		await assert.rejects(director.reflect(state, reflectionContext), /새로 목격한 사건/);
+		proposal = { ...noReflection, arousalUpdate: { value: 40, evidenceEventIds } };
+		await assert.rejects(director.reflect(state, reflectionContext), /새로 목격한 사건/);
+	}
+	proposal = { ...noReflection, relationshipUpdates: [{ targetId: 'player', changes: [{ field: 'trust', value: 35 }], impression: null, evidenceEventIds: ['fresh', 'fresh'] }], arousalUpdate: { value: 40, evidenceEventIds: ['fresh', 'fresh'] } };
+	const reflection = await director.reflect(state, reflectionContext);
+	assert.deepEqual(reflection.relationshipUpdates[0].evidenceEventIds, ['fresh']);
+	assert.deepEqual(reflection.arousalUpdate.evidenceEventIds, ['fresh']);
+});
+
 test('embedding aliases use the embedding provider and validate its real model ID', async (t) => {
 	environment(t); add(config('vectors', 'openai-compatible', { models: [{ id: 'memory', label: '기억 임베딩', modelId: 'actual-embedding', task: 'embedding' }] }));
 	const calls = fakeProvider();

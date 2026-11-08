@@ -54,6 +54,8 @@ After saving a provider, the upper **Refresh list** button (`목록 새로고침
 
 Choose **JSON Schema** or **JSON object** under the provider's advanced API options. JSON object mode also sends schema instructions in the conversation. Both modes use the same application-side validation; malformed output is not accepted as plain text.
 
+For OpenAI-compatible JSON Schema servers such as ArliAI, requests omit the unsupported array constraints `contains`, `minContains`, and `uniqueItems`. The app still validates fresh-event evidence and allowed event IDs and normalizes duplicate evidence IDs. Other schema constraints remain in the request.
+
 A successful Geniex `/decisions` request does **not** establish that its `/chat/completions` endpoint can enforce the required output format. If reflection or action generation repeatedly fails JSON validation, use a generation server with working structured output while keeping Geniex for decisions. A standalone `llama-server` can be registered as an OpenAI-compatible generation provider; validate it with the chosen model and output mode before using it for a session.
 
 Provider settings are shared across worlds, while model selections belong to each world. Accepted jobs pin their provider routes and models, including across server restarts. Apply new settings and use the manual retry control to retry a failed job with the current configuration.

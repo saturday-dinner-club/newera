@@ -81,6 +81,16 @@ export function modelSettings(): Settings {
 	}
 }
 
+/** Lower the subschema forms emitted by this app; evidence rules remain enforced by checkedReflection. */
+function compatibleGenerationSchema(input: unknown): Record<string, unknown> {
+	const schema = { ...record(input, '생성 JSON 스키마') };
+	for (const key of ['contains', 'minContains', 'uniqueItems']) delete schema[key];
+	if (schema.properties) schema.properties = Object.fromEntries(Object.entries(record(schema.properties, '스키마 필드')).map(([key, value]) => [key, compatibleGenerationSchema(value)]));
+	if (schema.items) schema.items = compatibleGenerationSchema(schema.items);
+	if (Array.isArray(schema.anyOf)) schema.anyOf = schema.anyOf.map(compatibleGenerationSchema);
+	return schema;
+}
+
 function providerBody(route: ProviderRoute, path: string, input: unknown): unknown {
 	if (input === undefined) return undefined;
 	const body: Record<string, unknown> = { ...record(input, 'Provider 요청'), model: route.model };
@@ -94,6 +104,10 @@ function providerBody(route: ProviderRoute, path: string, input: unknown): unkno
 				const schema = record(record(body.response_format, '구조화된 출력').json_schema, 'JSON 스키마').schema;
 				body.response_format = { type: 'json_object' };
 				body.messages = [...body.messages as unknown[], { role: 'user', content: `다음 JSON 스키마를 따르는 객체만 출력한다: ${JSON.stringify(schema)}` }];
+			} else {
+				const format = record(body.response_format, '구조화된 출력');
+				const jsonSchema = record(format.json_schema, 'JSON 스키마');
+				body.response_format = { ...format, json_schema: { ...jsonSchema, schema: compatibleGenerationSchema(jsonSchema.schema) } };
 			}
 		}
 	}
