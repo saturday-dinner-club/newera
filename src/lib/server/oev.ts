@@ -56,7 +56,7 @@ export function modelSettings(): Settings {
 		const candidate: Settings = {
 			baseUrl, decisionModel,
 			textModel: text(file.textModel ?? process.env.NEWERA_TEXT_MODEL ?? '', '생성 모델', 200, true) || decisionModel,
-			timeoutMs: integerSetting(file.timeoutMs ?? process.env.NEWERA_LLM_TIMEOUT_MS, 120000, '생성 대기 시간', 1800000),
+			timeoutMs: integerSetting(file.timeoutMs ?? process.env.NEWERA_LLM_TIMEOUT_MS, 900000, '생성 대기 시간', 1800000),
 			decisionTimeoutMs: integerSetting(file.decisionTimeoutMs ?? process.env.NEWERA_DECISION_TIMEOUT_MS, 120000, '판단 대기 시간', 1800000),
 			generationHistoryTokens: integerSetting(file.generationHistoryTokens ?? process.env.NEWERA_GENERATION_HISTORY_TOKENS, 32768, '생성 히스토리 토큰 한도', 131072, 256),
 			playerReplyTimeoutMs: integerSetting(file.playerReplyTimeoutMs ?? process.env.NEWERA_PLAYER_REPLY_TIMEOUT_MS, 300000, '플레이어 응답 대기 시간', 300000, 0),

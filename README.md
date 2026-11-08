@@ -120,7 +120,7 @@ The optional `data/models.json` file overrides corresponding environment default
 | `NEWERA_DECISION_MODEL` | `gemma4-26b` | Default decision model or `provider-id::alias-id` reference. |
 | `NEWERA_TEXT_MODEL` | Decision model | Default generation and reflection model or alias reference. |
 | `NEWERA_DECISION_TIMEOUT_MS` | `120000` | Per-request timeout for model discovery and decisions. |
-| `NEWERA_LLM_TIMEOUT_MS` | `120000` | Per-request timeout for Chat Completions. |
+| `NEWERA_LLM_TIMEOUT_MS` | `900000` | Per-request timeout for Chat Completions (15 minutes), including generation and reflection. |
 | `NEWERA_PLAYER_REPLY_TIMEOUT_MS` | `300000` | Real-time player reply window; `0` disables it, maximum `300000`. |
 | `NEWERA_GENERATION_HISTORY_TOKENS` | `32768` | Estimated history-token budget for action/dialogue generation. |
 | `NEWERA_MAX_RETRIES` | `2` | Additional attempts for retryable failures; `0` disables retries. |
